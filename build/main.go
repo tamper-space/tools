@@ -1,6 +1,6 @@
-// Builds the self-contained Hex Editor into <out>/hex/index.html: compiles the
-// engine to WASM and inlines it (base64) with wasm_exec.js and the UI, so the
-// single file also opens from file://. Run: go run ./hex/build [-out dir]
+// Builds each self-contained tool into <out>/<slug>/index.html: compiles the
+// tool's engine to WASM and inlines it (base64) with wasm_exec.js and the UI, so
+// each file also opens from file://. Run: go run ./build [-out dir]
 package main
 
 import (
@@ -14,28 +14,36 @@ import (
 	"github.com/tamper-space/tools"
 )
 
-const wasmPkg = "github.com/tamper-space/tools/hex/wasm"
+type tool struct{ slug, wasmPkg, uiDir string }
+
+var all = []tool{
+	{"hex", "github.com/tamper-space/tools/hex/wasm", "hex/ui"},
+	{"recipe", "github.com/tamper-space/tools/recipe/wasm", "recipe/ui"},
+}
 
 func main() {
 	out := flag.String("out", "dist", "output directory for tool bundles")
 	flag.Parse()
-
-	wasm := filepath.Join(os.TempDir(), "tamper-hex.wasm")
-	wasmExec := compile(wasm, wasmPkg)
-
-	b64 := base64.StdEncoding.EncodeToString(readFile(wasm))
 	fonts := fontFace("Tamper Sans", "theme/fonts/TamperSans.woff2", "100 1000") +
 		fontFace("Tamper Mono", "theme/fonts/TamperMono.woff2", "100 700")
-	html := replace(embedStr("hex/ui/index.tmpl.html"),
+	tokens := embedStr("theme/tokens.css")
+	for _, t := range all {
+		bundle(t, *out, fonts, tokens)
+	}
+}
+
+func bundle(t tool, out, fonts, tokens string) {
+	wasm := filepath.Join(os.TempDir(), "tamper-"+t.slug+".wasm")
+	wasmExec := compile(wasm, t.wasmPkg)
+	html := replace(embedStr(t.uiDir+"/index.tmpl.html"),
 		"/*WASM_EXEC*/", string(readFile(wasmExec)),
 		"/*FONTS_CSS*/", fonts,
-		"/*TOKENS_CSS*/", embedStr("theme/tokens.css"),
-		"/*APP_CSS*/", embedStr("hex/ui/app.css"),
-		"/*APP_JS*/", embedStr("hex/ui/app.js"),
-		"__WASM_B64__", b64,
+		"/*TOKENS_CSS*/", tokens,
+		"/*APP_CSS*/", embedStr(t.uiDir+"/app.css"),
+		"/*APP_JS*/", embedStr(t.uiDir+"/app.js"),
+		"__WASM_B64__", base64.StdEncoding.EncodeToString(readFile(wasm)),
 	)
-
-	dir := filepath.Join(*out, "hex")
+	dir := filepath.Join(out, t.slug)
 	must(os.MkdirAll(dir, 0o755))
 	dst := filepath.Join(dir, "index.html")
 	must(os.WriteFile(dst, []byte(html), 0o644))
@@ -48,7 +56,7 @@ func compile(out, pkg string) string {
 	if os.Getenv("TAMPER_WASM") != "go" {
 		if tinygo, err := exec.LookPath("tinygo"); err == nil {
 			run(exec.Command(tinygo, "build", "-o", out, "-target", "wasm", "-no-debug", "-opt=z", pkg))
-			println("tinygo:", sizeKB(out), "KB wasm")
+			println("tinygo:", sizeKB(out), "KB wasm", pkg)
 			return filepath.Join(toolEnv(tinygo, "TINYGOROOT"), "targets", "wasm_exec.js")
 		}
 		println("tinygo not found; using standard Go (larger bundle)")
@@ -56,7 +64,7 @@ func compile(out, pkg string) string {
 	c := exec.Command("go", "build", "-o", out, pkg)
 	c.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
 	run(c)
-	println("go:", sizeKB(out), "KB wasm")
+	println("go:", sizeKB(out), "KB wasm", pkg)
 	return filepath.Join(toolEnv("go", "GOROOT"), "lib", "wasm", "wasm_exec.js")
 }
 

@@ -4,5 +4,5 @@ package tools
 
 import "embed"
 
-//go:embed theme hex/ui
+//go:embed theme hex/ui recipe/ui
 var Assets embed.FS
