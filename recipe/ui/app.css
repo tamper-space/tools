@@ -42,9 +42,27 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .param input:focus { outline: none; border-color: var(--ring); }
 
 /* input / output */
-#io textarea {
-  flex: 1; min-height: 0; resize: none; border: none; outline: none; padding: 12px;
-  color: var(--foreground); background: var(--background); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+#inwrap { position: relative; flex: 1; min-height: 0; }
+#inwrap textarea, #input-mirror {
+  position: absolute; inset: 0; margin: 0; padding: 12px; border: 0; box-sizing: border-box;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: break-word;
 }
-#output { background: color-mix(in srgb, var(--foreground) 3%, transparent); }
+#input { resize: none; outline: none; background: transparent; color: var(--foreground); overflow: auto; z-index: 1; }
+#input-mirror { overflow: hidden; pointer-events: none; color: transparent; z-index: 0; }
+#output {
+  flex: 1; min-height: 0; resize: none; border: none; outline: none; padding: 12px;
+  color: var(--foreground); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
 #output.errored { color: var(--destructive); }
+
+/* remote collaborators' carets + selections, painted in the input mirror */
+.rc-sel { border-radius: 2px; }
+.rc-caret { position: relative; display: inline-block; width: 0; }
+.rc-caret::before { content: ""; position: absolute; left: -1px; top: 0.1em; height: 1.2em; width: 2px; background: var(--rc, #888); }
+.rc-label {
+  position: absolute; left: -1px; top: -1.4em; padding: 0 4px; border-radius: 3px;
+  font-family: var(--sans); font-size: 10px; line-height: 1.45; white-space: nowrap;
+  color: #fff; background: var(--rc, #888);
+}

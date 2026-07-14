@@ -7,6 +7,8 @@
   var runTimer = 0;
   var collabOn = false;
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
+  var remoteCursors = {}; // uid -> {name, color, start, end}
+  var mirror = null, cursorTimer = 0, lastCursorKey = "";
 
   window.init = function () {
     try { manifest = JSON.parse(tamperOps.manifest()); } catch (e) { manifest = []; }
@@ -16,6 +18,12 @@
     $("steps").addEventListener("click", onStepClick);
     $("steps").addEventListener("input", onParamInput);
     $("input").addEventListener("input", onInputEdit);
+    mirror = $("input-mirror");
+    var inp = $("input");
+    inp.addEventListener("scroll", function () { if (mirror) mirror.scrollTop = inp.scrollTop; });
+    inp.addEventListener("keyup", reportCursor);
+    inp.addEventListener("pointerup", reportCursor);
+    document.addEventListener("selectionchange", function () { if (document.activeElement === inp) reportCursor(); });
     $("copy").addEventListener("click", copyOutput);
     $("clear").addEventListener("click", clearRecipe);
     renderRecipe(); run();
@@ -96,6 +104,7 @@
     lastValue = v;
     inputBytes = s2b(v);
     $("inlen").textContent = inputBytes.length + " bytes";
+    renderCursors();
     clearTimeout(runTimer); runTimer = setTimeout(run, 150);
   }
   // diffToOps turns an input change into CRDT ops via a prefix/suffix diff:
@@ -139,6 +148,8 @@
     else if (m.type === "tamper:getState") reply();
     else if (m.type === "tamper:collab") onCollab(m);
     else if (m.type === "tamper:ops") onRemoteOps(m.ops);
+    else if (m.type === "tamper:cursor") { remoteCursors[m.uid] = { name: m.name, color: m.color, start: m.start, end: m.end }; renderCursors(); }
+    else if (m.type === "tamper:present") prunePresence(m.uids || []);
   }
   function loadArtifact(m) {
     var art = m.artifact || {};
@@ -154,7 +165,7 @@
   // seeds it from the loaded bytes; others receive the op log and apply it.
   function onCollab(m) {
     collabOn = !!m.on;
-    if (!collabOn) return;
+    if (!collabOn) { remoteCursors = {}; renderCursors(); return; }
     tamperCRDT.init(m.site || 1);
     if (m.seed) {
       var ops = JSON.parse(tamperCRDT.seed(inputBytes) || "[]");
@@ -172,6 +183,7 @@
     lastValue = text;
     inputBytes = s2b(text);
     $("inlen").textContent = inputBytes.length + " bytes";
+    renderCursors();
     clearTimeout(runTimer); runTimer = setTimeout(run, 150);
   }
   function reply() {
@@ -179,4 +191,54 @@
     post({ type: "tamper:state", name: name, bytes: ab, view: { v: 1, recipe: recipe } }, [ab]);
   }
   function post(msg, transfer) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, location.origin, transfer || []); }
+
+  // ---- remote cursors + selections ----
+  function reportCursor() {
+    if (!collabOn) return;
+    var el = $("input");
+    var key = el.selectionStart + ":" + el.selectionEnd;
+    if (key === lastCursorKey) return;
+    lastCursorKey = key;
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(function () { post({ type: "tamper:cursor", start: el.selectionStart, end: el.selectionEnd }); }, 60);
+  }
+  function prunePresence(uids) {
+    var keep = {};
+    uids.forEach(function (u) { keep[u] = 1; });
+    for (var k in remoteCursors) if (!keep[k]) delete remoteCursors[k];
+    renderCursors();
+  }
+  function clampPos(v, max) { v = v | 0; return v < 0 ? 0 : v > max ? max : v; }
+  function selBg(color) { return "color-mix(in srgb, " + color + " 30%, transparent)"; }
+  function caretHTML(c) { return '<span class="rc-caret" style="--rc:' + esc(c.color || "#888") + '"><span class="rc-label">' + esc(c.name || "?") + "</span></span>"; }
+  // renderCursors paints remote carets + selections into the mirror, splitting the
+  // text at cursor/selection boundaries so spans align to the text grid.
+  function renderCursors() {
+    if (!mirror) return;
+    var text = $("input").value;
+    var ids = Object.keys(remoteCursors);
+    if (!ids.length) { mirror.innerHTML = ""; mirror.scrollTop = $("input").scrollTop; return; }
+    var carets = {}, sels = [], bounds = {};
+    bounds[0] = 1; bounds[text.length] = 1;
+    ids.forEach(function (uid) {
+      var c = remoteCursors[uid];
+      var s = clampPos(c.start, text.length), e = clampPos(c.end, text.length);
+      (carets[e] = carets[e] || []).push(c);
+      bounds[e] = 1;
+      if (s !== e) { var lo = Math.min(s, e), hi = Math.max(s, e); sels.push({ lo: lo, hi: hi, color: c.color }); bounds[lo] = 1; bounds[hi] = 1; }
+    });
+    var pts = Object.keys(bounds).map(Number).sort(function (a, b) { return a - b; });
+    var html = "";
+    for (var p = 0; p < pts.length; p++) {
+      var pos = pts[p];
+      if (carets[pos]) carets[pos].forEach(function (c) { html += caretHTML(c); });
+      if (p < pts.length - 1) {
+        var a = pos, b = pts[p + 1], seg = esc(text.slice(a, b)), col = null;
+        for (var si = 0; si < sels.length; si++) if (a >= sels[si].lo && b <= sels[si].hi) { col = sels[si].color; break; }
+        html += col ? '<span class="rc-sel" style="background:' + selBg(col) + '">' + seg + "</span>" : seg;
+      }
+    }
+    mirror.innerHTML = html;
+    mirror.scrollTop = $("input").scrollTop;
+  }
 })();

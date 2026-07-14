@@ -24,7 +24,10 @@
   </section>
   <section id="io" class="pane">
     <div class="iohead"><span>Input</span><span id="inlen" class="dim">0 bytes</span></div>
-    <textarea id="input" spellcheck="false" placeholder="Type, paste, or open a file from the sidebar..."></textarea>
+    <div id="inwrap">
+      <div id="input-mirror" aria-hidden="true"></div>
+      <textarea id="input" spellcheck="false" placeholder="Type, paste, or open a file from the sidebar..."></textarea>
+    </div>
     <div class="iohead"><span>Output</span><span id="outlen" class="dim">0 bytes</span><button id="copy" title="Copy output">Copy</button></div>
     <textarea id="output" spellcheck="false" readonly></textarea>
   </section>
