@@ -5,6 +5,8 @@
   var inputBytes = new Uint8Array(0);
   var name = "untitled";
   var runTimer = 0;
+  var collabOn = false;
+  var lastValue = ""; // baseline for diffing input edits into CRDT ops
 
   window.init = function () {
     try { manifest = JSON.parse(tamperOps.manifest()); } catch (e) { manifest = []; }
@@ -86,9 +88,28 @@
   function clearRecipe() { recipe = []; renderRecipe(); run(); }
 
   function onInputEdit() {
-    inputBytes = s2b($("input").value);
+    var v = $("input").value;
+    if (collabOn) {
+      var ops = diffToOps(lastValue, v);
+      if (ops.length) post({ type: "tamper:ops", ops: ops });
+    }
+    lastValue = v;
+    inputBytes = s2b(v);
     $("inlen").textContent = inputBytes.length + " bytes";
     clearTimeout(runTimer); runTimer = setTimeout(run, 150);
+  }
+  // diffToOps turns an input change into CRDT ops via a prefix/suffix diff:
+  // delete the changed middle, insert the new middle.
+  function diffToOps(oldS, newS) {
+    var maxP = Math.min(oldS.length, newS.length), p = 0;
+    while (p < maxP && oldS.charCodeAt(p) === newS.charCodeAt(p)) p++;
+    var s = 0;
+    while (s < maxP - p && oldS.charCodeAt(oldS.length - 1 - s) === newS.charCodeAt(newS.length - 1 - s)) s++;
+    var ops = [], o, i;
+    for (i = 0; i < oldS.length - p - s; i++) { o = tamperCRDT.del(p); if (o && o !== "null") ops.push(JSON.parse(o)); }
+    var ins = newS.slice(p, newS.length - s);
+    for (i = 0; i < ins.length; i++) { o = tamperCRDT.insert(p + i, ins.charCodeAt(i) & 0xff); if (o && o !== "null") ops.push(JSON.parse(o)); }
+    return ops;
   }
 
   function run() {
@@ -116,15 +137,42 @@
     var m = e.data || {};
     if (m.type === "tamper:load") loadArtifact(m);
     else if (m.type === "tamper:getState") reply();
+    else if (m.type === "tamper:collab") onCollab(m);
+    else if (m.type === "tamper:ops") onRemoteOps(m.ops);
   }
   function loadArtifact(m) {
     var art = m.artifact || {};
     inputBytes = new Uint8Array(art.bytes || new ArrayBuffer(0));
     name = art.name || "untitled";
     $("input").value = b2s(inputBytes);
+    lastValue = $("input").value;
     $("inlen").textContent = inputBytes.length + " bytes";
     if (m.view && Array.isArray(m.view.recipe)) recipe = m.view.recipe;
     renderRecipe(); run();
+  }
+  // Collaboration: the input becomes a shared CRDT document. The first participant
+  // seeds it from the loaded bytes; others receive the op log and apply it.
+  function onCollab(m) {
+    collabOn = !!m.on;
+    if (!collabOn) return;
+    tamperCRDT.init(m.site || 1);
+    if (m.seed) {
+      var ops = JSON.parse(tamperCRDT.seed(inputBytes) || "[]");
+      lastValue = $("input").value;
+      if (ops.length) post({ type: "tamper:ops", ops: ops });
+    }
+  }
+  function onRemoteOps(ops) {
+    if (!collabOn || !ops || !ops.length) return;
+    tamperCRDT.loadOps(JSON.stringify(ops));
+    var text = b2s(tamperCRDT.text());
+    var el = $("input"), caret = el.selectionStart;
+    el.value = text;
+    el.selectionStart = el.selectionEnd = Math.min(caret, text.length);
+    lastValue = text;
+    inputBytes = s2b(text);
+    $("inlen").textContent = inputBytes.length + " bytes";
+    clearTimeout(runTimer); runTimer = setTimeout(run, 150);
   }
   function reply() {
     var ab = inputBytes.slice().buffer;

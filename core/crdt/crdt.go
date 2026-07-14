@@ -4,8 +4,6 @@
 // real-time collaborative text editing without a central coordinator.
 package crdt
 
-import "encoding/json"
-
 // ID uniquely identifies an inserted element: a per-site monotonic clock plus the
 // site id. The zero ID is the head sentinel.
 type ID struct {
@@ -269,12 +267,4 @@ func (d *Doc) Load(data []byte) []Op {
 		ops = append(ops, d.InsertAt(i, b))
 	}
 	return ops
-}
-
-// EncodeOp / DecodeOp are convenience helpers for the wire.
-func EncodeOp(op Op) []byte { b, _ := json.Marshal(op); return b }
-func DecodeOp(b []byte) (Op, error) {
-	var op Op
-	err := json.Unmarshal(b, &op)
-	return op, err
 }
