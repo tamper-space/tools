@@ -1,0 +1,65 @@
+/* Design tokens shared by the site and every tool. Plain CSS custom properties
+   (no Tailwind), so a tool can inline this directly and stay standalone. Light
+   in :root, dark under .dark. */
+:root {
+  --radius: 0.5rem;
+
+  --background: #f5f5f7;
+  --foreground: #1a1a1e;
+  --card: #ffffff;
+  --card-foreground: #1a1a1e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1e;
+  --primary: #2f80ed;
+  --primary-foreground: #ffffff;
+  --secondary: #ebebed;
+  --secondary-foreground: #1a1a1e;
+  --muted: #ebebed;
+  --muted-foreground: #5c5c66;
+  --accent: #e8e8ea;
+  --accent-foreground: #1a1a1e;
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  --border: #d0d0d5;
+  --input: #d0d0d5;
+  --ring: #2f80ed;
+
+  --swatch-0: #eb5757;
+  --swatch-1: #f2994a;
+  --swatch-2: #f2c94c;
+  --swatch-3: #219653;
+  --swatch-4: #27ae60;
+  --swatch-5: #6fcf97;
+  --swatch-6: #2f80ed;
+  --swatch-7: #2d9cdb;
+  --swatch-8: #56ccf2;
+  --swatch-9: #9b51e0;
+  --swatch-10: #bb6bd9;
+  --swatch-11: #e06c9a;
+  --swatch-12: #e07043;
+  --swatch-13: #8d5524;
+  --swatch-14: #b0b0b0;
+  --swatch-15: #f2f2f2;
+}
+
+.dark {
+  --background: #111113;
+  --foreground: #ececef;
+  --card: #19191b;
+  --card-foreground: #ececef;
+  --popover: #19191b;
+  --popover-foreground: #ececef;
+  --primary: #2f80ed;
+  --primary-foreground: #ffffff;
+  --secondary: #222225;
+  --secondary-foreground: #ececef;
+  --muted: #222225;
+  --muted-foreground: #9898a0;
+  --accent: #2a2a2d;
+  --accent-foreground: #ececef;
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  --border: #2a2a2d;
+  --input: #2a2a2d;
+  --ring: #2f80ed;
+}

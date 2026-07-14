@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>Hex Editor</title>
+<style>
+/*FONTS_CSS*/
+/*TOKENS_CSS*/
+/*APP_CSS*/
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tabbar" class="hidden"></div>
+  <div id="toolbar">
+    <button id="open">Open</button>
+    <span id="fname" class="dim">no file</span>
+    <span class="sep"></span>
+    <label>Goto <input id="goto" placeholder="0x0" spellcheck="false"></label>
+    <label>Find <input id="find" placeholder="hex, or /text" spellcheck="false"></label>
+    <button id="findPrev" title="Previous match (Shift+Enter)">Prev</button>
+    <button id="findNext" title="Next match (Enter)">Next</button>
+    <button id="findCase" title="Case-insensitive text match" aria-pressed="false">Aa</button>
+    <label>Replace <input id="replace" placeholder="hex, or /text" spellcheck="false"></label>
+    <button id="replaceOne" title="Replace current match">Replace</button>
+    <button id="replaceAll" title="Replace all matches">All</button>
+    <span id="findInfo" class="dim"></span>
+    <span class="sep"></span>
+    <label>Cols
+      <select id="bpr"><option>8</option><option selected>16</option><option>32</option></select>
+    </label>
+    <label>Text
+      <select id="enc"><option value="ascii">ASCII</option><option value="latin1">Latin-1</option><option value="cp437">CP437</option></select>
+    </label>
+    <label>Color <input type="checkbox" class="switch" id="color" checked></label>
+    <span class="sep"></span>
+    <button id="bookmark" title="Bookmark selection (or current byte)">Bookmark</button>
+    <button id="diffBtn" title="Compare two open files">Diff</button>
+    <button id="undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+    <button id="redo" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+    <span class="sep"></span>
+    <div id="exportWrap">
+      <button id="export" title="Export as">Export</button>
+      <div id="exportMenu" class="hidden">
+        <div class="exscope">
+          <button data-scope="whole">Whole file</button>
+          <button data-scope="sel">Selection</button>
+        </div>
+        <div id="exrows"></div>
+      </div>
+    </div>
+    <span id="stats" class="dim right"></span>
+  </div>
+  <div id="body">
+    <div id="main">
+      <div id="header"></div>
+      <div id="viewport" tabindex="0">
+        <div id="sizer"><div id="rows"></div></div>
+        <div id="empty">Drop a file, or click to open.</div>
+      </div>
+    </div>
+    <aside id="inspector">
+      <div class="panel">
+        <div class="phead">
+          <span>Inspector</span>
+          <label class="endian">big-endian <input type="checkbox" class="switch" id="endian"></label>
+        </div>
+        <table id="itable"></table>
+      </div>
+      <div class="panel">
+        <div class="phead"><span>Selection</span></div>
+        <div id="selinfo" class="dim">none</div>
+      </div>
+      <div class="panel">
+        <div class="phead"><span>Bookmarks</span></div>
+        <div id="bmList" class="dim">none</div>
+      </div>
+      <div class="panel">
+        <div class="phead">
+          <span>Strings</span>
+          <span class="strctl"><label>min <input id="strMin" value="4"></label><button id="strScan">Scan</button></span>
+        </div>
+        <div id="strCount" class="dim"></div>
+        <div id="strList"></div>
+      </div>
+    </aside>
+  </div>
+  <div id="diff" class="hidden">
+    <div id="diffbar">
+      <select id="diffA"></select>
+      <span class="dim">vs</span>
+      <select id="diffB"></select>
+      <span id="diffInfo" class="dim"></span>
+      <button id="diffPrev" title="Previous difference">Prev diff</button>
+      <button id="diffNext" title="Next difference">Next diff</button>
+      <button id="diffExit">Exit</button>
+    </div>
+    <div id="diffpanes">
+      <div class="diffpane">
+        <div class="dhead" id="diffAName"></div>
+        <div class="dvp" id="diffAvp"><div class="dsizer" id="diffAsizer"><div class="drows" id="diffArows"></div></div></div>
+      </div>
+      <div class="diffpane">
+        <div class="dhead" id="diffBName"></div>
+        <div class="dvp" id="diffBvp"><div class="dsizer" id="diffBsizer"><div class="drows" id="diffBrows"></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="status">
+    <span id="pos">no file</span>
+    <span id="dirty" class="dim"></span>
+    <span id="mode" class="right dim">overwrite</span>
+  </div>
+</div>
+<input id="file" type="file" hidden>
+<script>/*WASM_EXEC*/</script>
+<script>/*APP_JS*/</script>
+<script>
+const go = new Go();
+const b = atob("__WASM_B64__");
+const u = new Uint8Array(b.length);
+for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+WebAssembly.instantiate(u, go.importObject).then((r) => { go.run(r.instance); init(); });
+</script>
+</body>
+</html>
