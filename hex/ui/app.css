@@ -40,6 +40,9 @@ input, #itable td.v, #selinfo { user-select: text; -webkit-user-select: text; }
 .tabclose:hover { color: var(--foreground); background: var(--border); }
 .tabadd { height: auto; align-self: center; color: var(--muted-foreground); padding: 2px 8px; }
 
+/* Embedded in the workbench: the shell's explorer owns the file list. */
+body.embedded #open, body.embedded #fname, body.embedded #tabbar { display: none; }
+
 /* ---- toolbar ---- */
 #toolbar {
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;

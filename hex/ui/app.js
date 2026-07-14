@@ -19,7 +19,7 @@
   // Global/session state (view settings + open tabs). Per-file state lives in s.
   const g = {
     bpr: 16, enc: "ascii", colorOn: true, findCase: false, insert: false,
-    dragging: false, exScope: "whole", tabs: [], active: -1,
+    dragging: false, exScope: "whole", tabs: [], active: -1, embedded: false,
     diff: { on: false, a: 0, b: 1, pos: -1 },
   };
 
@@ -61,9 +61,9 @@
   }
 
   window.init = function () {
-    els.open.onclick = () => els.file.click();
+    els.open.onclick = () => { if (!g.embedded) els.file.click(); };
     els.file.onchange = (e) => e.target.files[0] && load(e.target.files[0]);
-    els.empty.addEventListener("click", () => els.file.click());
+    els.empty.addEventListener("click", () => { if (!g.embedded) els.file.click(); });
     els.tabbar.addEventListener("click", (e) => {
       if (e.target.closest(".tabadd")) return els.file.click();
       const cl = e.target.closest(".tabclose");
@@ -74,7 +74,7 @@
     els.viewport.addEventListener("dragover", (e) => e.preventDefault());
     els.viewport.addEventListener("drop", (e) => {
       e.preventDefault();
-      if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
+      if (!g.embedded && e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
     });
     els.viewport.addEventListener("scroll", scheduleRender);
     els.viewport.addEventListener("keydown", onKey);
@@ -133,10 +133,10 @@
       s.anchor = off; moveTo(Math.min(s.size - 1, off + len - 1), true);
     });
     window.addEventListener("resize", scheduleRender);
-    // Platform protocol: the tool stays platform-agnostic and only (de)serializes
-    // its own state on request. See the tamper: postMessage contract.
+    // Platform protocol (see docs/WORKSPACES.md): the tool is a lens over a byte
+    // buffer. The shell sends/receives raw bytes; view state stays separate.
     window.addEventListener("message", onPlatformMessage);
-    postToParent({ type: "tamper:ready", tool: "hex", capabilities: ["snapshot"] });
+    postToParent({ type: "tamper:ready", tool: "hex", accepts: ["bytes"] });
   };
 
   function toast(msg) {
@@ -145,41 +145,50 @@
     t.textContent = msg; t.classList.add("show");
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600);
   }
-  function b64enc(u8) { let r = ""; for (let i = 0; i < u8.length; i++) r += String.fromCharCode(u8[i]); return btoa(r); }
-  function b64dec(str) { const bin = atob(str), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; }
-
-  function postToParent(msg) {
-    if (window.parent && window.parent !== window) window.parent.postMessage(msg, location.origin);
+  function postToParent(msg, transfer) {
+    if (window.parent && window.parent !== window) window.parent.postMessage(msg, location.origin, transfer || []);
   }
-  function serializeState() {
-    if (!s.buf) return null;
-    return JSON.stringify({
-      v: 1, name: s.name, bpr: g.bpr, enc: g.enc, color: g.colorOn,
-      cursor: s.cursor, bookmarks: s.bookmarks, bmSeq: s.bmSeq, data: b64enc(s.buf),
-    });
+  function currentView() {
+    return { v: 2, bpr: g.bpr, enc: g.enc, color: g.colorOn, cursor: s.cursor, bookmarks: s.bookmarks, bmSeq: s.bmSeq };
   }
   function onPlatformMessage(e) {
     if (e.origin !== location.origin) return;
     const m = e.data || {};
-    if (m.type === "tamper:getState") {
-      postToParent({ type: "tamper:state", data: serializeState(), title: s.name || "snapshot" });
-    } else if (m.type === "tamper:loadState") {
-      try { loadSnapshot(JSON.parse(m.data)); } catch (err) { toast("Could not load shared state."); }
-    }
+    if (m.type === "tamper:load") loadArtifact(m);
+    else if (m.type === "tamper:getState") replyState();
   }
-
-  function loadSnapshot(o) {
-    const buf = b64dec(o.data || "");
-    const st = newState(buf, o.name || "shared");
+  function replyState() {
+    const ab = s.buf ? s.buf.slice().buffer : new ArrayBuffer(0);
+    postToParent({ type: "tamper:state", name: s.name || "", bytes: ab, view: currentView() }, [ab]);
+  }
+  function applyView(view) {
+    if (!view) return;
+    if (view.bpr) { g.bpr = view.bpr; els.bpr.value = String(view.bpr); }
+    if (view.enc) { g.enc = view.enc; els.enc.value = view.enc; }
+    if (typeof view.color === "boolean") { g.colorOn = view.color; els.color.checked = view.color; }
+  }
+  // loadArtifact renders a byte buffer the shell hands over (tamper:load). In
+  // embedded mode the shell owns the file list, so we keep a single buffer.
+  function loadArtifact(m) {
+    if (m.embedded) setEmbedded(true);
+    const art = m.artifact || {};
+    const st = newState(new Uint8Array(art.bytes || new ArrayBuffer(0)), art.name || "untitled");
     const a = tamperHex.analyze(st.buf);
     st.cats = a.categories; st.entropy = a.entropy;
-    st.cursor = Math.min(o.cursor || 0, Math.max(0, st.size - 1));
-    st.bookmarks = o.bookmarks || []; st.bmSeq = o.bmSeq || 0;
-    if (o.bpr) { g.bpr = o.bpr; els.bpr.value = String(o.bpr); }
-    if (o.enc) { g.enc = o.enc; els.enc.value = o.enc; }
-    if (typeof o.color === "boolean") { g.colorOn = o.color; els.color.checked = o.color; }
-    g.tabs.push(st); g.active = g.tabs.length - 1; s = st;
+    applyView(m.view);
+    if (m.view) {
+      st.cursor = Math.min(m.view.cursor || 0, Math.max(0, st.size - 1));
+      st.bookmarks = m.view.bookmarks || []; st.bmSeq = m.view.bmSeq || 0;
+    }
+    if (g.embedded) { g.tabs = [st]; g.active = 0; } else { g.tabs.push(st); g.active = g.tabs.length - 1; }
+    s = st;
     renderTabs(); syncTab();
+  }
+  function setEmbedded(on) {
+    if (g.embedded === on) return;
+    g.embedded = on;
+    document.body.classList.toggle("embedded", on);
+    if (on) els.empty.textContent = "Select or add a file in the sidebar.";
   }
 
   function load(file) {
