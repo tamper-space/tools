@@ -38,4 +38,4 @@ state over `postMessage` (same origin only):
 
 ## License
 
-Copyright 2026 Justus Johnson. Licensed under the [Apache License 2.0](LICENSE).
+Licensed under the [GNU General Public License v3.0](LICENSE).
