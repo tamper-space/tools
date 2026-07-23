@@ -125,8 +125,6 @@
   }
   function isTrue(v) { v = String(v).toLowerCase(); return v === "true" || v === "1" || v === "yes" || v === "on"; }
 
-  var ICON_EYE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
-  var ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M6.7 6.7C3.6 8.6 2 12 2 12s3 7 10 7c2 .1 3.9-.5 5.5-1.5"/><path d="M9.9 4.2A11 11 0 0 1 12 4c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7"/></svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   var ICON_CHEV_UP = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
   var ICON_CHEV_DOWN = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
@@ -146,10 +144,8 @@
           '<span class="draghandle" aria-hidden="true">⠇⠇</span>' +
           '<span class="stepnum">' + (i + 1) + "</span>" +
           '<span class="stepname"' + desc + ">" + esc(op.name) + "</span>" +
-          '<span class="stepctl">' +
-            '<button class="stepbtn" data-toggle="' + i + '" title="' + (step.disabled ? "Enable" : "Disable") + '" aria-label="Toggle step">' + (step.disabled ? ICON_EYE_OFF : ICON_EYE) + "</button>" +
-            '<button class="stepbtn" data-del="' + i + '" title="Remove" aria-label="Remove step">' + ICON_X + "</button>" +
-          "</span>" +
+          '<button class="stepswitch" data-toggle="' + i + '" role="switch" aria-checked="' + (!step.disabled) + '" title="' + (step.disabled ? "Enable step" : "Disable step") + '"><span class="switch"></span></button>' +
+          '<span class="stepctl"><button class="stepbtn" data-del="' + i + '" title="Remove step" aria-label="Remove step">' + ICON_X + "</button></span>" +
         "</div>" +
         (params ? '<div class="params">' + params + "</div>" : "") + "</div>";
     }).join("");
@@ -285,7 +281,7 @@
   // failed-step highlight.
   function run() {
     var res = eng.runRecipe(JSON.stringify(recipe.map(function (s) {
-      return { id: s.id, args: s.args || {} };
+      return { id: s.id, args: s.args || {}, disabled: !!s.disabled };
     })), inputBytes);
     var out = res.output || new Uint8Array(0);
     $("output").value = b2s(out);
