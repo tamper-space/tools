@@ -139,20 +139,21 @@
   function saveCats() { try { localStorage.setItem("tn-recipe-cats", JSON.stringify(catOpen)); } catch (e) {} }
   var ICON_CHEV_RIGHT = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   var ICON_PIN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8a2 2 0 0 0 .6 1.4l1.4 1.3H7l1.4-1.3a2 2 0 0 0 .6-1.4Z"/></svg>';
+  var ICON_UNPIN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>';
 
   function opItemHTML(op) {
     var d = op.description ? ' title="' + esc(op.description) + '"' : "";
-    var on = pins.indexOf(op.id) >= 0 ? " on" : "";
+    var pinned = pins.indexOf(op.id) >= 0;
     return '<div class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" +
       '<span class="opitem-name">' + esc(op.name) + "</span>" +
-      '<button type="button" class="oppin' + on + '" data-pin="' + esc(op.id) + '" tabindex="-1" title="' + (on ? "Unpin" : "Pin") + '" aria-label="Pin operation">' + ICON_PIN + "</button>" +
+      '<button type="button" class="oppin' + (pinned ? " on" : "") + '" data-pin="' + esc(op.id) + '" tabindex="-1" title="' + (pinned ? "Unpin" : "Pin") + '" aria-label="' + (pinned ? "Unpin operation" : "Pin operation") + '">' + (pinned ? ICON_UNPIN : ICON_PIN) + "</button>" +
       "</div>";
   }
   function opGroup(cat, ops, open) {
     var head = '<button type="button" class="opcat" data-cat="' + esc(cat) + '">' +
       '<span class="opcat-chev' + (open ? " open" : "") + '">' + ICON_CHEV_RIGHT + "</span>" +
       "<span>" + esc(cat) + '</span><span class="opcat-n">' + ops.length + "</span></button>";
-    return open ? head + ops.map(opItemHTML).join("") : head;
+    return open ? head + '<div class="opcat-items">' + ops.map(opItemHTML).join("") + "</div>" : head;
   }
 
   function renderOps() {

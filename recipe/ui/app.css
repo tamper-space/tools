@@ -49,8 +49,8 @@ button:hover { background: var(--accent); color: var(--foreground); }
 #opsearch:focus { outline: none; border-color: var(--ring); }
 #oplist { flex: 1; overflow-y: auto; padding: 6px; }
 .opcat {
-  display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 4px;
-  padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left;
+  display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 12px;
+  padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left;
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--foreground); cursor: pointer;
 }
 .opcat:first-child { margin-top: 0; }
@@ -58,14 +58,17 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .opcat-chev { display: inline-flex; color: var(--muted-foreground); transition: transform 0.12s; }
 .opcat-chev.open { transform: rotate(90deg); }
 .opcat-n { margin-left: auto; font-family: var(--mono); font-size: 9.5px; font-weight: 500; color: var(--muted-foreground); }
-.opitem { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 6px 5px 8px; border-radius: 7px; color: var(--foreground); border: 1px solid transparent; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+/* an open category's ops sit under an indented guide line, so the group reads as one */
+.opcat-items { display: flex; flex-direction: column; gap: 1px; margin: 3px 0 2px 15px; padding-left: 6px; border-left: 1px solid var(--border); }
+.opitem { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 4px 5px 8px; border-radius: 6px; color: var(--foreground); border: 1px solid transparent; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
 .opitem:hover { background: var(--accent); border-color: color-mix(in srgb, var(--foreground) 10%, transparent); }
 .opitem:active { transform: translateY(1px); }
 .opitem-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oppin { flex: none; width: 22px; height: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: 5px; color: var(--muted-foreground); opacity: 0; transition: opacity 0.1s, color 0.1s, background 0.1s; }
+/* pin control is hover-only (both the add-pin and the pinned rows) so the list stays calm */
 .opitem:hover .oppin { opacity: 0.5; }
 .oppin:hover { opacity: 1; background: color-mix(in srgb, var(--foreground) 8%, transparent); color: var(--foreground); }
-.oppin.on { opacity: 1; color: var(--foreground); }
+.oppin.on:hover { opacity: 1; background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
 .empty { padding: 10px; }
 
 /* recipe */
