@@ -206,7 +206,11 @@ button:hover { background: var(--accent); color: var(--foreground); }
   color: var(--foreground); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
   background: color-mix(in srgb, var(--foreground) 3%, transparent);
 }
-#output.errored { color: var(--destructive); }
+#output::placeholder { color: var(--muted-foreground); opacity: 0.7; }
+/* error strip: names the failing step without reddening the (partial) output text */
+#out-error { flex: none; display: flex; align-items: center; gap: 7px; padding: 8px 12px; font-family: var(--mono); font-size: 11px; line-height: 1.4; color: var(--destructive); background: color-mix(in srgb, var(--destructive) 10%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--destructive) 28%, transparent); }
+#out-error[hidden] { display: none; }
+#out-error svg { flex: none; }
 
 /* remote collaborators' carets + selections, painted in the input mirror */
 .rc-sel { border-radius: 2px; }

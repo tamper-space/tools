@@ -452,10 +452,13 @@
     var failAt = typeof res.failedAt === "number" ? res.failedAt : -1;
     var steps = $("steps").children;
     for (var k = 0; k < steps.length; k++) steps[k].classList.toggle("failed", k === failAt);
-    $("output").classList.toggle("errored", failAt >= 0);
-    $("outlen").textContent = failAt >= 0
-      ? "error: " + (res.error || "failed")
-      : fmtBytes(out.length) + " · " + fmtMs(ms);
+    if (failAt >= 0) {
+      $("out-error-msg").textContent = "Step " + (failAt + 1) + " failed: " + (res.error || "unknown error");
+      $("out-error").hidden = false;
+    } else {
+      $("out-error").hidden = true;
+    }
+    $("outlen").textContent = fmtBytes(out.length) + " · " + fmtMs(ms);
     refreshMagic();
   }
   function fmtBytes(n) { return n === 1 ? "1 byte" : n + " bytes"; }
