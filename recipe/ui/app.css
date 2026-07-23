@@ -37,6 +37,8 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .iobtn { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; color: var(--muted-foreground); }
 .iobtn:hover { background: var(--accent); color: var(--foreground); }
 .iobtn:active { color: var(--primary); }
+/* clearing the input is destructive: warn in red on hover */
+#in-clear:hover { background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
 .iobtn svg { display: block; }
 .iobtn.ok { color: var(--primary); }
 .i-max, .i-min { display: inline-flex; }
