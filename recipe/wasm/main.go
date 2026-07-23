@@ -58,6 +58,7 @@ func create(_ js.Value, a []js.Value) any {
 		return string(out)
 	})
 	b.Bind(obj, "run", func(_ js.Value, a []js.Value) any { return runOp(a) })
+	b.Bind(obj, "runRecipe", func(_ js.Value, a []js.Value) any { return runRecipe(a) })
 	b.Bind(obj, "seed", func(_ js.Value, a []js.Value) any {
 		out, _ := json.Marshal(inst.doc.Load(wasmutil.ToGo(a[0])))
 		return string(out)
@@ -123,6 +124,27 @@ func create(_ js.Value, a []js.Value) any {
 	})
 	b.Bind(obj, "dispose", func(_ js.Value, _ []js.Value) any { inst.fns.Release(); return nil })
 	return obj
+}
+
+// runRecipe interprets a whole step list (with flow control) in one call.
+// a[0] = steps JSON ([{id, args, disabled}]), a[1] = input bytes. Returns
+// {output, failedAt, error, steps:[{error}]}.
+func runRecipe(a []js.Value) any {
+	var steps []ops.Step
+	_ = json.Unmarshal([]byte(a[0].String()), &steps)
+	res := ops.RunRecipe(steps, wasmutil.ToGo(a[1]))
+	out := js.Global().Get("Object").New()
+	out.Set("output", wasmutil.ToJS(res.Output))
+	out.Set("failedAt", res.FailedAt)
+	out.Set("error", res.Error)
+	stepArr := js.Global().Get("Array").New(len(res.Steps))
+	for i, s := range res.Steps {
+		o := js.Global().Get("Object").New()
+		o.Set("error", s.Error)
+		stepArr.SetIndex(i, o)
+	}
+	out.Set("steps", stepArr)
+	return out
 }
 
 func runOp(a []js.Value) any {

@@ -72,8 +72,9 @@ inside a deleted range collapse to the cut).
 
 ```js
 const rec = tamperEngines.recipe.create({site: 42}); // CRDT site id, default 1
-rec.manifest();                  // JSON op catalog [{id, name, category, params}]
-rec.run(id, inputU8, args);      // {output: Uint8Array} | {error}
+rec.manifest();                  // JSON op catalog [{id, name, category, params, options}]
+rec.run(id, inputU8, args);      // one op: {output: Uint8Array} | {error}
+rec.runRecipe(stepsJSON, inputU8); // whole chain incl. flow control (see below)
 rec.seed(u8); rec.loadOps(json); // CRDT: load initial bytes / apply remote ops
 rec.insert(pos, byte); rec.del(pos); // CRDT edits -> op JSON to broadcast
 rec.text();                      // current CRDT bytes
@@ -83,6 +84,21 @@ rec.dispose();
 The recipe chain (which ops in which order, with which args) is view config:
 the host owns it and persists it in the envelope's `view` field. The engine
 executes ops; it does not store the chain.
+
+**runRecipe** runs the entire chain in one call, including flow control. `stepsJSON`
+is `[{id, args, disabled?}]`; it returns `{output: Uint8Array, failedAt: number
+(-1 if none), error: string, steps: [{error}]}`. Op arguments arrive as strings
+(the engine parses per param type); native booleans/numbers are coerced. Flow-control
+operations are interpreted here, not as standalone ops:
+
+- **Fork** (`splitDelim`, `mergeDelim`) splits the data into branches that later
+  steps apply to independently.
+- **Merge** recombines the branches with the fork's merge delimiter.
+- **Register** (`regex`) captures the pattern's groups into `$R0`, `$R1`, ... which
+  are substituted into later steps' argument strings.
+
+If a chain is still forked at the end, the output joins the branches on the merge
+delimiter.
 
 ## Serialization envelope
 

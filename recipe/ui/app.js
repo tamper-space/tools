@@ -145,18 +145,20 @@
     return ops;
   }
 
+  // run executes the whole recipe through the engine interpreter (one call), so
+  // flow-control steps (Fork/Merge/Register) work; the per-step error drives the
+  // failed-step highlight.
   function run() {
-    var cur = inputBytes, failAt = -1, errMsg = "";
-    for (var i = 0; i < recipe.length; i++) {
-      var res = eng.run(recipe[i].id, cur, recipe[i].args || {});
-      if (res && res.error) { failAt = i; errMsg = res.error; break; }
-      cur = res.output;
-    }
-    $("output").value = b2s(cur);
+    var res = eng.runRecipe(JSON.stringify(recipe.map(function (s) {
+      return { id: s.id, args: s.args || {} };
+    })), inputBytes);
+    var out = res.output || new Uint8Array(0);
+    $("output").value = b2s(out);
+    var failAt = typeof res.failedAt === "number" ? res.failedAt : -1;
     var steps = $("steps").children;
     for (var k = 0; k < steps.length; k++) steps[k].classList.toggle("failed", k === failAt);
     $("output").classList.toggle("errored", failAt >= 0);
-    $("outlen").textContent = failAt >= 0 ? "error: " + errMsg : cur.length + " bytes";
+    $("outlen").textContent = failAt >= 0 ? "error: " + (res.error || "failed") : out.length + " bytes";
   }
 
   function copyOutput() {
