@@ -509,9 +509,12 @@
 
   // ---- magic wand: detect likely decodings of the current input, one-click apply ----
   var MAGIC_MAX = 262144; // skip detection on very large inputs (runs candidate decodes)
+  // Suggestions analyze the current OUTPUT (the dish), not the raw input: applying a
+  // decode changes the output, so the wand advances to the next layer and clears once
+  // the result is readable, instead of lingering on an already-applied suggestion.
   function refreshMagic() {
-    if (!eng || !eng.magicSuggest || !inputBytes.length || inputBytes.length > MAGIC_MAX) suggestions = [];
-    else { try { suggestions = JSON.parse(eng.magicSuggest(inputBytes)) || []; } catch (e) { suggestions = []; } }
+    if (!eng || !eng.magicSuggest || !lastOutput.length || lastOutput.length > MAGIC_MAX) suggestions = [];
+    else { try { suggestions = JSON.parse(eng.magicSuggest(lastOutput)) || []; } catch (e) { suggestions = []; } }
     $("magic-wand").classList.toggle("has", suggestions.length > 0);
     if (magicOpen) renderMagic();
   }
