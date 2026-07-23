@@ -49,6 +49,8 @@
     $("bp-prev").addEventListener("click", function () { if (breakpoint > 0) setBreakpoint(breakpoint - 1); });
     $("bp-next").addEventListener("click", function () { if (breakpoint >= 0 && breakpoint < recipe.length - 1) setBreakpoint(breakpoint + 1); });
     $("bp-clear").addEventListener("click", function () { setBreakpoint(-1); });
+    $("io-max").addEventListener("click", toggleMax);
+    initResize();
     renderRecipe(); run();
     window.addEventListener("message", onMsg);
     post({ type: "tamper:ready", tool: "recipe", accepts: ["bytes"] });
@@ -74,6 +76,37 @@
     $("in-enc").value = inEnc; $("out-enc").value = outEnc; $("in-eol").value = eol;
   }
   function saveIO() { try { localStorage.setItem("tn-recipe-io", JSON.stringify({ inEnc: inEnc, outEnc: outEnc, eol: eol })); } catch (e) {} }
+
+  // ---- layout: drag-resizable columns + a maximize toggle for the I/O pane ----
+  var colW = { ops: 240, recipe: 340 };
+  var COL_LIMITS = { ops: [160, 460], recipe: [220, 640] };
+  function applyCols() { var c = $("cols"); c.style.setProperty("--w-ops", colW.ops + "px"); c.style.setProperty("--w-recipe", colW.recipe + "px"); }
+  function saveCols() { try { localStorage.setItem("tn-recipe-cols", JSON.stringify(colW)); } catch (e) {} }
+  function initResize() {
+    try { var s = JSON.parse(localStorage.getItem("tn-recipe-cols")); if (s) { if (s.ops) colW.ops = s.ops; if (s.recipe) colW.recipe = s.recipe; } } catch (e) {}
+    applyCols();
+    var cols = $("cols"), drag = null;
+    cols.addEventListener("pointerdown", function (e) {
+      var g = e.target.closest(".gutter"); if (!g) return;
+      drag = { key: g.dataset.resize, x: e.clientX, w: colW[g.dataset.resize], g: g };
+      g.classList.add("dragging");
+      try { g.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    cols.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var lim = COL_LIMITS[drag.key];
+      colW[drag.key] = Math.max(lim[0], Math.min(lim[1], drag.w + (e.clientX - drag.x)));
+      applyCols();
+    });
+    function end() { if (!drag) return; drag.g.classList.remove("dragging"); drag = null; saveCols(); }
+    cols.addEventListener("pointerup", end);
+    cols.addEventListener("pointercancel", end);
+  }
+  function toggleMax() {
+    var on = $("cols").classList.toggle("maximized");
+    $("io-max").title = on ? "Restore the workspace" : "Maximize the workspace";
+  }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function opByID(id) { for (var i = 0; i < manifest.length; i++) if (manifest[i].id === id) return manifest[i]; return null; }
 

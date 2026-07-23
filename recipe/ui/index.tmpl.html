@@ -17,6 +17,7 @@
     <div class="phead"><input id="opsearch" placeholder="Search operations..." spellcheck="false"></div>
     <div id="oplist"></div>
   </section>
+  <div class="gutter" data-resize="ops" aria-hidden="true"></div>
   <section id="recipe" class="pane">
     <div class="phead"><span>Recipe</span><button id="clear" title="Remove all steps">Clear</button></div>
     <div id="stepbar" hidden>
@@ -28,6 +29,7 @@
     <div id="steps"></div>
     <div id="recipe-empty" class="dim">Click an operation to add it.</div>
   </section>
+  <div class="gutter" data-resize="recipe" aria-hidden="true"></div>
   <section id="io" class="pane">
     <div class="iohead">
       <span>Input</span>
@@ -35,6 +37,7 @@
         <span id="inlen" class="dim iostat">0 bytes</span>
         <select id="in-eol" class="iosel" title="Input line endings" aria-label="Input line endings"><option value="LF">LF</option><option value="CRLF">CRLF</option><option value="CR">CR</option></select>
         <select id="in-enc" class="iosel" title="Input encoding" aria-label="Input encoding"><option value="latin1">Latin-1</option><option value="utf8">UTF-8</option></select>
+        <button id="io-max" class="iobtn" title="Maximize the workspace" aria-label="Maximize the workspace"><span class="i-max"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span><span class="i-min"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></span></button>
         <button id="in-clear" class="iobtn" title="Clear input" aria-label="Clear input"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </span>
     </div>
