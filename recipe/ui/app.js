@@ -47,24 +47,51 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function opByID(id) { for (var i = 0; i < manifest.length; i++) if (manifest[i].id === id) return manifest[i]; return null; }
 
+  // Pinned "Common" group: the everyday operations, surfaced at the top so the 100+
+  // catalog isn't a wall. Order here is the display order.
+  var PINNED = "Common";
+  var COMMON = ["magic", "from-base64", "to-base64", "from-hex", "to-hex", "url-decode", "url-encode", "from-charcode", "find-replace", "xor", "md5", "sha256", "gunzip", "jwt-decode"];
+  // Category open/closed state, persisted. Default: only Common open (categories
+  // collapsed by default); a search overrides this to reveal all matches.
+  var catOpen = (function () { try { return JSON.parse(localStorage.getItem("tn-recipe-cats")) || {}; } catch (e) { return {}; } })();
+  function isOpen(cat) { return cat === PINNED ? catOpen[cat] !== false : catOpen[cat] === true; }
+  function saveCats() { try { localStorage.setItem("tn-recipe-cats", JSON.stringify(catOpen)); } catch (e) {} }
+  var ICON_CHEV_RIGHT = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+
+  function opItemHTML(op) {
+    var d = op.description ? ' title="' + esc(op.description) + '"' : "";
+    return '<button type="button" class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" + esc(op.name) + "</button>";
+  }
+  function opGroup(cat, ops, open, pinned) {
+    var head = '<button type="button" class="opcat' + (pinned ? " pinned" : "") + '" data-cat="' + esc(cat) + '">' +
+      '<span class="opcat-chev' + (open ? " open" : "") + '">' + ICON_CHEV_RIGHT + "</span>" +
+      "<span>" + esc(cat) + '</span><span class="opcat-n">' + ops.length + "</span></button>";
+    return open ? head + ops.map(opItemHTML).join("") : head;
+  }
+
   function renderOps() {
     var q = ($("opsearch").value || "").toLowerCase();
+    var searching = q.length > 0;
+    var match = function (op) { return !q || op.name.toLowerCase().indexOf(q) >= 0 || op.category.toLowerCase().indexOf(q) >= 0; };
+    var html = "";
+
+    var common = COMMON.map(opByID).filter(function (op) { return op && match(op); });
+    if (common.length) html += opGroup(PINNED, common, searching || isOpen(PINNED), true);
+
     var cats = {}, orderCats = [];
     manifest.forEach(function (op) {
-      if (q && op.name.toLowerCase().indexOf(q) < 0 && op.category.toLowerCase().indexOf(q) < 0) return;
+      if (!match(op)) return;
       if (!cats[op.category]) { cats[op.category] = []; orderCats.push(op.category); }
       cats[op.category].push(op);
     });
-    var html = orderCats.map(function (cat) {
-      return '<div class="opcat">' + esc(cat) + "</div>" + cats[cat].map(function (op) {
-        var d = op.description ? ' title="' + esc(op.description) + '"' : "";
-        return '<button type="button" class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" + esc(op.name) + "</button>";
-      }).join("");
-    }).join("");
+    orderCats.forEach(function (cat) { html += opGroup(cat, cats[cat], searching || isOpen(cat), false); });
+
     $("oplist").innerHTML = html || '<div class="dim empty">No operations.</div>';
   }
 
   function onOpClick(e) {
+    var cat = e.target.closest("[data-cat]");
+    if (cat) { var c = cat.dataset.cat; catOpen[c] = !isOpen(c); saveCats(); renderOps(); return; }
     var b = e.target.closest("[data-add]");
     if (!b) return;
     var op = opByID(b.dataset.add);

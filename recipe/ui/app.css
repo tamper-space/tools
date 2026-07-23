@@ -26,7 +26,17 @@ button:hover { background: var(--accent); color: var(--foreground); }
 #opsearch { width: 100%; font: inherit; height: 28px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; text-transform: none; letter-spacing: 0; }
 #opsearch:focus { outline: none; border-color: var(--ring); }
 #oplist { flex: 1; overflow-y: auto; padding: 6px; }
-.opcat { padding: 8px 6px 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+.opcat {
+  display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 2px;
+  padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); cursor: pointer;
+}
+.opcat:first-child { margin-top: 0; }
+.opcat:hover { background: var(--accent); color: var(--foreground); }
+.opcat.pinned { color: var(--primary); }
+.opcat-chev { display: inline-flex; color: color-mix(in srgb, currentColor 70%, transparent); transition: transform 0.12s; }
+.opcat-chev.open { transform: rotate(90deg); }
+.opcat-n { margin-left: auto; font-family: var(--mono); font-size: 9px; letter-spacing: 0; opacity: 0.55; }
 .opitem { display: block; width: 100%; text-align: left; padding: 6px 8px; border-radius: 7px; color: var(--foreground); border: 1px solid transparent; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
 .opitem:hover { background: var(--accent); border-color: color-mix(in srgb, var(--foreground) 10%, transparent); }
 .opitem:active { transform: translateY(1px); }
