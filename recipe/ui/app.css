@@ -212,10 +212,17 @@ button:hover { background: var(--accent); color: var(--foreground); }
 }
 #input { resize: none; outline: none; background: transparent; color: var(--foreground); overflow: auto; z-index: 1; }
 #input-mirror { overflow: hidden; pointer-events: none; color: transparent; z-index: 0; }
+/* Divide the output section from the input above it: a stronger rule plus the
+   output header carrying the same tint as the output body, so the lower half reads
+   as one distinct surface rather than bleeding out of the input. */
+#inwrap + .iohead {
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
 #output {
   flex: 1; min-height: 0; resize: none; border: none; outline: none; padding: 12px;
   color: var(--foreground); font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
-  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 #output::placeholder { color: var(--muted-foreground); opacity: 0.7; }
 /* error strip: names the failing step without reddening the (partial) output text */
