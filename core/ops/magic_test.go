@@ -42,3 +42,25 @@ func TestMagic(t *testing.T) {
 		t.Errorf("plain text misidentified:\n%s", plain)
 	}
 }
+
+func TestMagicSuggest(t *testing.T) {
+	b64 := mustRun(t, "to-base64", "Hello, world!", nil)
+	hits := MagicSuggest([]byte(b64))
+	if len(hits) == 0 {
+		t.Fatalf("expected a suggestion for base64 input")
+	}
+	if hits[0].OpID != "from-base64" {
+		t.Errorf("best suggestion opID = %q, want from-base64", hits[0].OpID)
+	}
+	if hits[0].Score <= 0 || hits[0].Score > 1 {
+		t.Errorf("score out of range: %v", hits[0].Score)
+	}
+	if !strings.Contains(hits[0].Preview, "Hello") {
+		t.Errorf("preview did not show the decoded text: %q", hits[0].Preview)
+	}
+
+	// Plain text yields no confident suggestions.
+	if got := MagicSuggest([]byte("just some ordinary words here")); len(got) != 0 {
+		t.Errorf("plain text produced suggestions: %+v", got)
+	}
+}

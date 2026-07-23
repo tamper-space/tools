@@ -7,6 +7,7 @@
   var name = "untitled";
   var inEnc = "latin1", outEnc = "latin1", eol = "LF"; // I/O text encoding + line endings
   var breakpoint = -1; // step index to bake up to (-1 = full recipe)
+  var suggestions = [], magicOpen = false; // magic-wand decode candidates + popover state
   var runTimer = 0;
   var collabOn = false;
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
@@ -50,6 +51,13 @@
     $("bp-next").addEventListener("click", function () { if (breakpoint >= 0 && breakpoint < recipe.length - 1) setBreakpoint(breakpoint + 1); });
     $("bp-clear").addEventListener("click", function () { setBreakpoint(-1); });
     $("io-max").addEventListener("click", toggleMax);
+    $("magic-wand").addEventListener("click", toggleMagic);
+    $("magic-pop").addEventListener("click", onMagicClick);
+    document.addEventListener("click", function (e) {
+      if (!magicOpen) return;
+      if (e.target.closest("#magic-pop") || e.target.closest("#magic-wand")) return;
+      closeMagic();
+    });
     initResize();
     renderRecipe(); run();
     window.addEventListener("message", onMsg);
@@ -403,6 +411,7 @@
     $("outlen").textContent = failAt >= 0
       ? "error: " + (res.error || "failed")
       : fmtBytes(out.length) + " · " + fmtMs(ms);
+    refreshMagic();
   }
   function fmtBytes(n) { return n === 1 ? "1 byte" : n + " bytes"; }
   function fmtMs(ms) { return (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + " ms"; }
@@ -448,6 +457,42 @@
   function downloadName() {
     var base = name && name !== "untitled" ? name.replace(/\.[^.]*$/, "") : "output";
     return base + ".dat";
+  }
+
+  // ---- magic wand: detect likely decodings of the current input, one-click apply ----
+  var MAGIC_MAX = 262144; // skip detection on very large inputs (runs candidate decodes)
+  function refreshMagic() {
+    if (!eng || !eng.magicSuggest || !inputBytes.length || inputBytes.length > MAGIC_MAX) suggestions = [];
+    else { try { suggestions = JSON.parse(eng.magicSuggest(inputBytes)) || []; } catch (e) { suggestions = []; } }
+    $("magic-wand").classList.toggle("has", suggestions.length > 0);
+    if (magicOpen) renderMagic();
+  }
+  function toggleMagic(e) { e.stopPropagation(); if (magicOpen) closeMagic(); else openMagic(); }
+  function openMagic() { magicOpen = true; $("magic-pop").hidden = false; renderMagic(); }
+  function closeMagic() { magicOpen = false; $("magic-pop").hidden = true; }
+  function renderMagic() {
+    var pop = $("magic-pop");
+    if (!suggestions.length) { pop.innerHTML = '<div class="magic-empty">No confident decoding detected for this input.</div>'; return; }
+    pop.innerHTML = '<div class="magic-head">Suggested decodings</div>' + suggestions.map(function (s) {
+      return '<button type="button" class="magic-item" data-magic="' + esc(s.opID) + '">' +
+        '<span class="magic-row"><span class="magic-label">' + esc(s.label) + '</span>' +
+        '<span class="magic-score">' + Math.round((s.score || 0) * 100) + '%</span></span>' +
+        '<span class="magic-prev">' + esc(s.preview || "") + "</span></button>";
+    }).join("");
+  }
+  function onMagicClick(e) {
+    var it = e.target.closest("[data-magic]");
+    if (!it) return;
+    applySuggestion(it.dataset.magic);
+    closeMagic();
+  }
+  // applySuggestion appends the suggested decode op with its defaults and re-bakes.
+  function applySuggestion(opID) {
+    var op = opByID(opID); if (!op) return;
+    var args = {};
+    (op.params || []).forEach(function (p) { args[p.name] = p.default || ""; });
+    recipe.push({ id: opID, args: args });
+    renderRecipe(); run();
   }
 
   // Platform protocol (tamper: v2): the recipe operates on the input artifact;

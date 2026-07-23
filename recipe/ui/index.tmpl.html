@@ -37,10 +37,12 @@
         <span id="inlen" class="dim iostat">0 bytes</span>
         <select id="in-eol" class="iosel" title="Input line endings" aria-label="Input line endings"><option value="LF">LF</option><option value="CRLF">CRLF</option><option value="CR">CR</option></select>
         <select id="in-enc" class="iosel" title="Input encoding" aria-label="Input encoding"><option value="latin1">Latin-1</option><option value="utf8">UTF-8</option></select>
+        <button id="magic-wand" class="iobtn" title="Magic: suggest decodings" aria-label="Magic: suggest decodings"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg></button>
         <button id="io-max" class="iobtn" title="Maximize the workspace" aria-label="Maximize the workspace"><span class="i-max"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span><span class="i-min"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></span></button>
         <button id="in-clear" class="iobtn" title="Clear input" aria-label="Clear input"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </span>
     </div>
+    <div id="magic-pop" hidden></div>
     <div id="inwrap">
       <div id="input-mirror" aria-hidden="true"></div>
       <textarea id="input" spellcheck="false" placeholder="Type, paste, or open a file from the sidebar..."></textarea>

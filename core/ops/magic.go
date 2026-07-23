@@ -60,12 +60,16 @@ var magicDetectors = []magicDetector{
 
 type magicHit struct {
 	label   string
+	opID    string
 	preview string
 	score   float64 // printable ratio of the decoded result
 	entropy float64
 }
 
-func magicRun(in []byte, a Args) ([]byte, error) {
+// magicDetect runs each candidate decoder over the input and keeps the ones that
+// yield confident (mostly printable) text, ranked best first. Shared by the Magic
+// op (text report) and MagicSuggest (structured, for the wand UI).
+func magicDetect(in []byte) []magicHit {
 	var hits []magicHit
 	trimmed := strings.TrimSpace(string(in))
 	for _, d := range magicDetectors {
@@ -80,7 +84,7 @@ func magicRun(in []byte, a Args) ([]byte, error) {
 		if score < 0.85 { // decoded to binary/garbage: not a confident text decode
 			continue
 		}
-		hits = append(hits, magicHit{d.label, preview(out, 80), score, shannon(out)})
+		hits = append(hits, magicHit{d.label, d.opID, preview(out, 80), score, shannon(out)})
 	}
 	// Rank: most printable first, then lowest entropy (more structured).
 	for i := 0; i < len(hits); i++ {
@@ -90,6 +94,31 @@ func magicRun(in []byte, a Args) ([]byte, error) {
 			}
 		}
 	}
+	return hits
+}
+
+// MagicHit is one candidate decoding surfaced to a host: a human label, the op
+// that performs it, a printable preview of the result, and a 0..1 confidence.
+type MagicHit struct {
+	Label   string  `json:"label"`
+	OpID    string  `json:"opID"`
+	Preview string  `json:"preview"`
+	Score   float64 `json:"score"`
+}
+
+// MagicSuggest returns ranked candidate decodings for the input (best first), for
+// an ambient "magic wand" affordance. Empty when nothing decodes confidently.
+func MagicSuggest(in []byte) []MagicHit {
+	hits := magicDetect(in)
+	out := make([]MagicHit, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, MagicHit{Label: h.label, OpID: h.opID, Preview: h.preview, Score: h.score})
+	}
+	return out
+}
+
+func magicRun(in []byte, a Args) ([]byte, error) {
+	hits := magicDetect(in)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "Input: %d bytes, %.0f%% printable, entropy %.2f bits/byte\n\n", len(in), printableRatio(in)*100, shannon(in))

@@ -59,6 +59,10 @@ func create(_ js.Value, a []js.Value) any {
 	})
 	b.Bind(obj, "run", func(_ js.Value, a []js.Value) any { return runOp(a) })
 	b.Bind(obj, "runRecipe", func(_ js.Value, a []js.Value) any { return runRecipe(a) })
+	b.Bind(obj, "magicSuggest", func(_ js.Value, a []js.Value) any {
+		out, _ := json.Marshal(ops.MagicSuggest(wasmutil.ToGo(a[0])))
+		return string(out)
+	})
 	b.Bind(obj, "seed", func(_ js.Value, a []js.Value) any {
 		out, _ := json.Marshal(inst.doc.Load(wasmutil.ToGo(a[0])))
 		return string(out)
