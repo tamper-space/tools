@@ -128,10 +128,14 @@ func create(_ js.Value, a []js.Value) any {
 func runOp(a []js.Value) any {
 	args := ops.Args{}
 	if len(a) > 2 && a[2].Type() == js.TypeObject {
+		str := js.Global().Get("String")
 		keys := js.Global().Get("Object").Call("keys", a[2])
 		for i := 0; i < keys.Length(); i++ {
 			k := keys.Index(i).String()
-			args[k] = a[2].Get(k).String()
+			// Coerce every value the JS way, so a host may pass a boolean or number
+			// (String(true) -> "true", String(5) -> "5"), not only strings. Args are
+			// always strings on the Go side; ops parse per param type.
+			args[k] = str.Invoke(a[2].Get(k)).String()
 		}
 	}
 	out, err := ops.Run(a[0].String(), wasmutil.ToGo(a[1]), args)

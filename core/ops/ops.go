@@ -22,6 +22,8 @@ type ParamType string
 const (
 	ParamText   ParamType = "text"
 	ParamNumber ParamType = "number"
+	ParamBool   ParamType = "boolean" // rendered as a checkbox; value "true"/"false"
+	ParamSelect ParamType = "select"  // rendered as a dropdown over Options
 )
 
 type Param struct {
@@ -29,9 +31,11 @@ type Param struct {
 	Label   string    `json:"label"`
 	Type    ParamType `json:"type"`
 	Default string    `json:"default,omitempty"`
+	Options []string  `json:"options,omitempty"` // for ParamSelect
 }
 
-// Args are an operation's parameter values, keyed by Param.Name.
+// Args are an operation's parameter values, keyed by Param.Name. Values arrive
+// from the host as strings regardless of param type.
 type Args map[string]string
 
 func (a Args) Get(k string) string { return a[k] }
@@ -40,6 +44,13 @@ func (a Args) Int(k string, def int) int {
 		return n
 	}
 	return def
+}
+func (a Args) Bool(k string) bool {
+	switch strings.ToLower(strings.TrimSpace(a[k])) {
+	case "true", "1", "yes", "on":
+		return true
+	}
+	return false
 }
 
 type Op struct {

@@ -20,6 +20,7 @@
     $("oplist").addEventListener("click", onOpClick);
     $("steps").addEventListener("click", onStepClick);
     $("steps").addEventListener("input", onParamInput);
+    $("steps").addEventListener("change", onParamInput);
     $("input").addEventListener("input", onInputEdit);
     mirror = $("input-mirror");
     var inp = $("input");
@@ -67,13 +68,31 @@
     renderRecipe(); run();
   }
 
+  // paramControl renders a host-native control per param type (select dropdown,
+  // boolean checkbox, number, or text) so the tool inherits the platform look.
+  function paramControl(p, i, val) {
+    var attrs = 'data-step="' + i + '" data-param="' + esc(p.name) + '"';
+    if (p.type === "select") {
+      return '<select ' + attrs + ">" + (p.options || []).map(function (o) {
+        return '<option value="' + esc(o) + '"' + (String(val) === String(o) ? " selected" : "") + ">" + esc(o) + "</option>";
+      }).join("") + "</select>";
+    }
+    if (p.type === "boolean") {
+      return '<input type="checkbox" ' + attrs + (isTrue(val) ? " checked" : "") + ">";
+    }
+    if (p.type === "number") {
+      return '<input type="number" ' + attrs + ' value="' + esc(val == null ? "" : val) + '">';
+    }
+    return '<input ' + attrs + ' value="' + esc(val == null ? "" : val) + '">';
+  }
+  function isTrue(v) { v = String(v).toLowerCase(); return v === "true" || v === "1" || v === "yes" || v === "on"; }
+
   function renderRecipe() {
     $("recipe-empty").style.display = recipe.length ? "none" : "block";
     $("steps").innerHTML = recipe.map(function (step, i) {
       var op = opByID(step.id) || { name: step.id, params: [] };
       var params = (op.params || []).map(function (p) {
-        return '<label class="param">' + esc(p.label || p.name) +
-          '<input data-step="' + i + '" data-param="' + esc(p.name) + '" value="' + esc(step.args[p.name] || "") + '"></label>';
+        return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, step.args[p.name]) + "</label>";
       }).join("");
       return '<div class="step" data-i="' + i + '"><div class="stephead"><span class="stepname">' + esc(op.name) + "</span>" +
         '<span class="stepctl"><button data-up="' + i + '" title="Move up">↑</button><button data-down="' + i + '" title="Move down">↓</button><button data-del="' + i + '" title="Remove">×</button></span></div>' +
@@ -91,9 +110,10 @@
     renderRecipe(); run();
   }
   function onParamInput(e) {
-    var inp = e.target.closest("input[data-step]");
-    if (!inp) return;
-    recipe[+inp.dataset.step].args[inp.dataset.param] = inp.value;
+    var el = e.target.closest("[data-param]");
+    if (!el) return;
+    var val = el.type === "checkbox" ? (el.checked ? "true" : "false") : el.value;
+    recipe[+el.dataset.step].args[el.dataset.param] = val;
     run();
   }
   function clearRecipe() { recipe = []; renderRecipe(); run(); }

@@ -40,6 +40,10 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .param { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted-foreground); }
 .param input { font: inherit; height: 26px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; }
 .param input:focus { outline: none; border-color: var(--ring); }
+.param select { font: inherit; height: 26px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; }
+.param select:focus { outline: none; border-color: var(--ring); }
+.param:has(input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 6px; }
+.param input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--primary); }
 
 /* input / output */
 #inwrap { position: relative; flex: 1; min-height: 0; }
