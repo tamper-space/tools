@@ -133,10 +133,11 @@
     savePins(); renderOps();
   }
   // Category open/closed state, persisted. Default: only Pinned open (categories
-  // collapsed by default); a search overrides this to reveal all matches.
-  var catOpen = (function () { try { return JSON.parse(localStorage.getItem("tn-recipe-cats")) || {}; } catch (e) { return {}; } })();
+  // collapsed by default); a search overrides this to reveal all matches. Key is
+  // versioned (-v2) to reset stale state from before Pinned defaulted open.
+  var catOpen = (function () { try { return JSON.parse(localStorage.getItem("tn-recipe-cats-v2")) || {}; } catch (e) { return {}; } })();
   function isOpen(cat) { return cat === PINNED ? catOpen[cat] !== false : catOpen[cat] === true; }
-  function saveCats() { try { localStorage.setItem("tn-recipe-cats", JSON.stringify(catOpen)); } catch (e) {} }
+  function saveCats() { try { localStorage.setItem("tn-recipe-cats-v2", JSON.stringify(catOpen)); } catch (e) {} }
   var ICON_CHEV_RIGHT = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   var ICON_PIN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8a2 2 0 0 0 .6 1.4l1.4 1.3H7l1.4-1.3a2 2 0 0 0 .6-1.4Z"/></svg>';
   var ICON_UNPIN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>';
