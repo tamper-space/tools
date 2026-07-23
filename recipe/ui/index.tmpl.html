@@ -36,6 +36,16 @@
 <script>/*APP_JS*/</script>
 <script>
 const go = new Go();
+// TinyGo does not wire the stdlib's wasm randomness import (gojs.runtime.getRandomData),
+// which crypto/rand (and thus RSA) needs. Provide it from the platform CSPRNG using the
+// same (ptr,len) convention as TinyGo's other gojs imports. Guarded so the standard-Go
+// build path, whose own wasm_exec.js defines this with a different ABI, is left untouched.
+go.importObject.gojs = go.importObject.gojs || {};
+if (!go.importObject.gojs["runtime.getRandomData"]) {
+  go.importObject.gojs["runtime.getRandomData"] = (ptr, len) => {
+    crypto.getRandomValues(new Uint8Array(go._inst.exports.memory.buffer, Number(ptr), Number(len)));
+  };
+}
 const b = atob("__WASM_B64__");
 const u = new Uint8Array(b.length);
 for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
