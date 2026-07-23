@@ -18,6 +18,8 @@
     renderOps();
     $("opsearch").addEventListener("input", renderOps);
     $("oplist").addEventListener("click", onOpClick);
+    $("oplist").addEventListener("dragstart", onOpDragStart);
+    $("oplist").addEventListener("dragend", onStepDragEnd);
     $("steps").addEventListener("click", onStepClick);
     $("steps").addEventListener("input", onParamInput);
     $("steps").addEventListener("change", onParamInput);
@@ -55,7 +57,8 @@
     });
     var html = orderCats.map(function (cat) {
       return '<div class="opcat">' + esc(cat) + "</div>" + cats[cat].map(function (op) {
-        return '<button type="button" class="opitem" data-add="' + esc(op.id) + '">' + esc(op.name) + "</button>";
+        var d = op.description ? ' title="' + esc(op.description) + '"' : "";
+        return '<button type="button" class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" + esc(op.name) + "</button>";
       }).join("");
     }).join("");
     $("oplist").innerHTML = html || '<div class="dim empty">No operations.</div>';
@@ -85,7 +88,11 @@
       return '<input type="checkbox" ' + attrs + (isTrue(val) ? " checked" : "") + ">";
     }
     if (p.type === "number") {
-      return '<input type="number" ' + attrs + ' value="' + esc(val == null ? "" : val) + '">';
+      // Custom stepper: native spin buttons don't theme in dark mode, so hide them
+      // (CSS) and draw our own increment/decrement controls.
+      return '<span class="numfield"><input type="number" ' + attrs + ' value="' + esc(val == null ? "" : val) + '">' +
+        '<span class="numspin"><button type="button" class="numbtn" data-num="up" tabindex="-1" aria-label="Increase">&#9650;</button>' +
+        '<button type="button" class="numbtn" data-num="down" tabindex="-1" aria-label="Decrease">&#9660;</button></span></span>';
     }
     return '<input ' + attrs + ' value="' + esc(val == null ? "" : val) + '">';
   }
@@ -120,6 +127,8 @@
   }
 
   function onStepClick(e) {
+    var num = e.target.closest("[data-num]");
+    if (num) { stepNumber(num); return; }
     var t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.del != null) recipe.splice(+t.dataset.del, 1);
@@ -127,14 +136,35 @@
     else return;
     renderRecipe(); run();
   }
+  // stepNumber adjusts a number param via the custom +/- buttons, respecting the
+  // input's step/min/max, without a full re-render (keeps focus).
+  function stepNumber(btn) {
+    var input = btn.closest(".numfield").querySelector("input");
+    var stepBy = parseFloat(input.step) || 1;
+    var cur = parseFloat(input.value) || 0;
+    var next = btn.dataset.num === "up" ? cur + stepBy : cur - stepBy;
+    if (input.min !== "") next = Math.max(parseFloat(input.min), next);
+    if (input.max !== "") next = Math.min(parseFloat(input.max), next);
+    input.value = String(next);
+    recipe[+input.dataset.step].args[input.dataset.param] = input.value;
+    run();
+  }
 
-  // ---- drag to reorder ----
-  var dragFrom = -1;
+  // ---- drag: reorder steps, and add operations from the list ----
+  var dragFrom = -1;  // step index being reordered
+  var dragOp = null;  // operation id being dragged in from the list
+  function onOpDragStart(e) {
+    var b = e.target.closest("[data-add]");
+    if (!b) return;
+    dragOp = b.dataset.add; dragFrom = -1;
+    e.dataTransfer.effectAllowed = "copy";
+    try { e.dataTransfer.setData("text/plain", dragOp); } catch (_) {}
+  }
   function onStepDragStart(e) {
     if (e.target.closest(".params")) { e.preventDefault(); return; } // let inputs select text
     var step = e.target.closest(".step");
     if (!step) return;
-    dragFrom = +step.dataset.i;
+    dragFrom = +step.dataset.i; dragOp = null;
     step.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
     try { e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) {}
@@ -151,27 +181,37 @@
     return { i: +step.dataset.i, after: e.clientY > r.top + r.height / 2, el: step };
   }
   function onStepDragOver(e) {
-    if (dragFrom < 0) return;
+    if (dragFrom < 0 && !dragOp) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = dragOp ? "copy" : "move";
+    if (dragOp) $("recipe").classList.add("drag-target");
     clearDropMarks();
     var t = dropTarget(e);
     if (t && t.i !== dragFrom) t.el.classList.add(t.after ? "drop-after" : "drop-before");
   }
   function onStepDrop(e) {
-    if (dragFrom < 0) return;
+    if (dragFrom < 0 && !dragOp) return;
     e.preventDefault();
+    $("recipe").classList.remove("drag-target");
     var t = dropTarget(e);
     var to = t ? (t.after ? t.i + 1 : t.i) : recipe.length;
-    if (dragFrom < to) to--; // the splice-out shifts everything after dragFrom left
-    var item = recipe.splice(dragFrom, 1)[0];
-    to = Math.max(0, Math.min(recipe.length, to));
-    recipe.splice(to, 0, item);
-    dragFrom = -1;
+    if (dragOp) {
+      // Insert a new step from the operations list at the drop point.
+      var op = opByID(dragOp), args = {};
+      if (op) (op.params || []).forEach(function (p) { args[p.name] = p.default || ""; });
+      recipe.splice(Math.max(0, Math.min(recipe.length, to)), 0, { id: dragOp, args: args });
+    } else {
+      if (dragFrom < to) to--; // the splice-out shifts everything after dragFrom left
+      var item = recipe.splice(dragFrom, 1)[0];
+      recipe.splice(Math.max(0, Math.min(recipe.length, to)), 0, item);
+    }
+    dragFrom = -1; dragOp = null;
     renderRecipe(); run();
   }
   function onStepDragEnd() {
-    dragFrom = -1;
+    dragFrom = -1; dragOp = null;
     clearDropMarks();
+    $("recipe").classList.remove("drag-target");
     var d = $("steps").querySelector(".dragging");
     if (d) d.classList.remove("dragging");
   }
