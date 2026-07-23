@@ -12,9 +12,13 @@ to any tool through the postMessage protocol below.
 ## Layout
 
 - `core/<tool>` — the pure engine (no I/O, no UI), the single source of truth.
-- `<tool>/wasm` — a `syscall/js` shim exposing the engine to the browser.
+- `engine/` — the public contract: API version and the serialization envelope
+  hosts persist (see [docs/ENGINE-API.md](docs/ENGINE-API.md)).
+- `<tool>/wasm` — a `syscall/js` shim exposing the engine to the browser as
+  `tamperEngines.<tool>` (versioned, instantiable) plus the legacy globals the
+  bundled UIs still use.
 - `<tool>/ui` — the tool's HTML/CSS/JS.
-- `<tool>/build` — bundler that compiles the engine and inlines everything.
+- `build` — bundler that compiles each engine and inlines everything.
 - `theme` — shared design tokens and fonts, embedded into each bundle.
 
 ## Build
