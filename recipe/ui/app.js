@@ -21,6 +21,10 @@
     $("steps").addEventListener("click", onStepClick);
     $("steps").addEventListener("input", onParamInput);
     $("steps").addEventListener("change", onParamInput);
+    $("steps").addEventListener("dragstart", onStepDragStart);
+    $("steps").addEventListener("dragover", onStepDragOver);
+    $("steps").addEventListener("drop", onStepDrop);
+    $("steps").addEventListener("dragend", onStepDragEnd);
     $("input").addEventListener("input", onInputEdit);
     mirror = $("input-mirror");
     var inp = $("input");
@@ -87,6 +91,11 @@
   }
   function isTrue(v) { v = String(v).toLowerCase(); return v === "true" || v === "1" || v === "yes" || v === "on"; }
 
+  var ICON_EYE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M6.7 6.7C3.6 8.6 2 12 2 12s3 7 10 7c2 .1 3.9-.5 5.5-1.5"/><path d="M9.9 4.2A11 11 0 0 1 12 4c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7"/></svg>';
+  var ICON_X = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  var flowIDs = { fork: 1, merge: 1, register: 1, subsection: 1, label: 1, jump: 1, "conditional-jump": 1 };
+
   function renderRecipe() {
     $("recipe-empty").style.display = recipe.length ? "none" : "block";
     $("steps").innerHTML = recipe.map(function (step, i) {
@@ -94,8 +103,18 @@
       var params = (op.params || []).map(function (p) {
         return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, step.args[p.name]) + "</label>";
       }).join("");
-      return '<div class="step" data-i="' + i + '"><div class="stephead"><span class="stepname">' + esc(op.name) + "</span>" +
-        '<span class="stepctl"><button data-up="' + i + '" title="Move up">↑</button><button data-down="' + i + '" title="Move down">↓</button><button data-del="' + i + '" title="Remove">×</button></span></div>' +
+      var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "");
+      var desc = op.description ? ' title="' + esc(op.description) + '"' : "";
+      return '<div class="' + cls + '" data-i="' + i + '" draggable="true">' +
+        '<div class="stephead">' +
+          '<span class="draghandle" aria-hidden="true">⠇⠇</span>' +
+          '<span class="stepnum">' + (i + 1) + "</span>" +
+          '<span class="stepname"' + desc + ">" + esc(op.name) + "</span>" +
+          '<span class="stepctl">' +
+            '<button class="stepbtn" data-toggle="' + i + '" title="' + (step.disabled ? "Enable" : "Disable") + '" aria-label="Toggle step">' + (step.disabled ? ICON_EYE_OFF : ICON_EYE) + "</button>" +
+            '<button class="stepbtn" data-del="' + i + '" title="Remove" aria-label="Remove step">' + ICON_X + "</button>" +
+          "</span>" +
+        "</div>" +
         (params ? '<div class="params">' + params + "</div>" : "") + "</div>";
     }).join("");
   }
@@ -104,10 +123,57 @@
     var t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.del != null) recipe.splice(+t.dataset.del, 1);
-    else if (t.dataset.up != null) { var i = +t.dataset.up; if (i > 0) recipe.splice(i - 1, 0, recipe.splice(i, 1)[0]); }
-    else if (t.dataset.down != null) { var j = +t.dataset.down; if (j < recipe.length - 1) recipe.splice(j + 1, 0, recipe.splice(j, 1)[0]); }
+    else if (t.dataset.toggle != null) { var s = recipe[+t.dataset.toggle]; s.disabled = !s.disabled; }
     else return;
     renderRecipe(); run();
+  }
+
+  // ---- drag to reorder ----
+  var dragFrom = -1;
+  function onStepDragStart(e) {
+    if (e.target.closest(".params")) { e.preventDefault(); return; } // let inputs select text
+    var step = e.target.closest(".step");
+    if (!step) return;
+    dragFrom = +step.dataset.i;
+    step.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) {}
+  }
+  function clearDropMarks() {
+    Array.prototype.forEach.call($("steps").querySelectorAll(".drop-before,.drop-after"), function (el) {
+      el.classList.remove("drop-before", "drop-after");
+    });
+  }
+  function dropTarget(e) {
+    var step = e.target.closest(".step");
+    if (!step) return null;
+    var r = step.getBoundingClientRect();
+    return { i: +step.dataset.i, after: e.clientY > r.top + r.height / 2, el: step };
+  }
+  function onStepDragOver(e) {
+    if (dragFrom < 0) return;
+    e.preventDefault();
+    clearDropMarks();
+    var t = dropTarget(e);
+    if (t && t.i !== dragFrom) t.el.classList.add(t.after ? "drop-after" : "drop-before");
+  }
+  function onStepDrop(e) {
+    if (dragFrom < 0) return;
+    e.preventDefault();
+    var t = dropTarget(e);
+    var to = t ? (t.after ? t.i + 1 : t.i) : recipe.length;
+    if (dragFrom < to) to--; // the splice-out shifts everything after dragFrom left
+    var item = recipe.splice(dragFrom, 1)[0];
+    to = Math.max(0, Math.min(recipe.length, to));
+    recipe.splice(to, 0, item);
+    dragFrom = -1;
+    renderRecipe(); run();
+  }
+  function onStepDragEnd() {
+    dragFrom = -1;
+    clearDropMarks();
+    var d = $("steps").querySelector(".dragging");
+    if (d) d.classList.remove("dragging");
   }
   function onParamInput(e) {
     var el = e.target.closest("[data-param]");
