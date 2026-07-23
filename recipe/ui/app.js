@@ -47,23 +47,35 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function opByID(id) { for (var i = 0; i < manifest.length; i++) if (manifest[i].id === id) return manifest[i]; return null; }
 
-  // Pinned "Common" group: the everyday operations, surfaced at the top so the 100+
-  // catalog isn't a wall. Order here is the display order.
-  var PINNED = "Common";
-  var COMMON = ["magic", "from-base64", "to-base64", "from-hex", "to-hex", "url-decode", "url-encode", "from-charcode", "find-replace", "xor", "md5", "sha256", "gunzip", "jwt-decode"];
-  // Category open/closed state, persisted. Default: only Common open (categories
+  // Pinned group: a default set of everyday ops, surfaced at the top so the 100+
+  // catalog isn't a wall. Users pin/unpin any op; the set persists.
+  var PINNED = "Pinned";
+  var DEFAULT_PINS = ["magic", "from-base64", "to-base64", "from-hex", "to-hex", "url-decode", "url-encode", "from-charcode", "find-replace", "xor", "md5", "sha256", "gunzip", "jwt-decode"];
+  var pins = (function () { try { var s = JSON.parse(localStorage.getItem("tn-recipe-pins")); if (Array.isArray(s)) return s; } catch (e) {} return DEFAULT_PINS.slice(); })();
+  function savePins() { try { localStorage.setItem("tn-recipe-pins", JSON.stringify(pins)); } catch (e) {} }
+  function togglePin(id) {
+    var i = pins.indexOf(id);
+    if (i >= 0) pins.splice(i, 1); else pins.push(id);
+    savePins(); renderOps();
+  }
+  // Category open/closed state, persisted. Default: only Pinned open (categories
   // collapsed by default); a search overrides this to reveal all matches.
   var catOpen = (function () { try { return JSON.parse(localStorage.getItem("tn-recipe-cats")) || {}; } catch (e) { return {}; } })();
   function isOpen(cat) { return cat === PINNED ? catOpen[cat] !== false : catOpen[cat] === true; }
   function saveCats() { try { localStorage.setItem("tn-recipe-cats", JSON.stringify(catOpen)); } catch (e) {} }
   var ICON_CHEV_RIGHT = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  var ICON_PIN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.8V4h6v6.8a2 2 0 0 0 .6 1.4l1.4 1.3H7l1.4-1.3a2 2 0 0 0 .6-1.4Z"/></svg>';
 
   function opItemHTML(op) {
     var d = op.description ? ' title="' + esc(op.description) + '"' : "";
-    return '<button type="button" class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" + esc(op.name) + "</button>";
+    var on = pins.indexOf(op.id) >= 0 ? " on" : "";
+    return '<div class="opitem" draggable="true" data-add="' + esc(op.id) + '"' + d + ">" +
+      '<span class="opitem-name">' + esc(op.name) + "</span>" +
+      '<button type="button" class="oppin' + on + '" data-pin="' + esc(op.id) + '" tabindex="-1" title="' + (on ? "Unpin" : "Pin") + '" aria-label="Pin operation">' + ICON_PIN + "</button>" +
+      "</div>";
   }
-  function opGroup(cat, ops, open, pinned) {
-    var head = '<button type="button" class="opcat' + (pinned ? " pinned" : "") + '" data-cat="' + esc(cat) + '">' +
+  function opGroup(cat, ops, open) {
+    var head = '<button type="button" class="opcat" data-cat="' + esc(cat) + '">' +
       '<span class="opcat-chev' + (open ? " open" : "") + '">' + ICON_CHEV_RIGHT + "</span>" +
       "<span>" + esc(cat) + '</span><span class="opcat-n">' + ops.length + "</span></button>";
     return open ? head + ops.map(opItemHTML).join("") : head;
@@ -75,21 +87,22 @@
     var match = function (op) { return !q || op.name.toLowerCase().indexOf(q) >= 0 || op.category.toLowerCase().indexOf(q) >= 0; };
     var html = "";
 
-    var common = COMMON.map(opByID).filter(function (op) { return op && match(op); });
-    if (common.length) html += opGroup(PINNED, common, searching || isOpen(PINNED), true);
+    var pinnedOps = pins.map(opByID).filter(function (op) { return op && match(op); });
+    if (pinnedOps.length) html += opGroup(PINNED, pinnedOps, searching || isOpen(PINNED));
 
-    var cats = {}, orderCats = [];
+    var cats = {};
     manifest.forEach(function (op) {
       if (!match(op)) return;
-      if (!cats[op.category]) { cats[op.category] = []; orderCats.push(op.category); }
-      cats[op.category].push(op);
+      (cats[op.category] = cats[op.category] || []).push(op);
     });
-    orderCats.forEach(function (cat) { html += opGroup(cat, cats[cat], searching || isOpen(cat), false); });
+    Object.keys(cats).sort().forEach(function (cat) { html += opGroup(cat, cats[cat], searching || isOpen(cat)); });
 
     $("oplist").innerHTML = html || '<div class="dim empty">No operations.</div>';
   }
 
   function onOpClick(e) {
+    var pin = e.target.closest("[data-pin]");
+    if (pin) { togglePin(pin.dataset.pin); return; }
     var cat = e.target.closest("[data-cat]");
     if (cat) { var c = cat.dataset.cat; catOpen[c] = !isOpen(c); saveCats(); renderOps(); return; }
     var b = e.target.closest("[data-add]");
