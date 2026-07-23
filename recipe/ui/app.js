@@ -8,6 +8,8 @@
   var inEnc = "latin1", outEnc = "latin1", eol = "LF"; // I/O text encoding + line endings
   var breakpoint = -1; // step index to bake up to (-1 = full recipe)
   var suggestions = [], magicOpen = false; // magic-wand decode candidates + popover state
+  var tabs = [{ name: "untitled", value: "" }]; // input tabs; the recipe is shared across them
+  var activeTab = 0;
   var runTimer = 0;
   var collabOn = false;
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
@@ -32,6 +34,7 @@
     $("steps").addEventListener("drop", onStepDrop);
     $("steps").addEventListener("dragend", onStepDragEnd);
     $("input").addEventListener("input", onInputEdit);
+    $("tabs").addEventListener("click", onTabClick);
     mirror = $("input-mirror");
     var inp = $("input");
     inp.addEventListener("scroll", function () { if (mirror) mirror.scrollTop = inp.scrollTop; });
@@ -59,7 +62,7 @@
       closeMagic();
     });
     initResize();
-    renderRecipe(); run();
+    renderTabs(); renderRecipe(); run();
     window.addEventListener("message", onMsg);
     post({ type: "tamper:ready", tool: "recipe", accepts: ["bytes"] });
   };
@@ -363,6 +366,46 @@
   }
   function clearRecipe() { recipe = []; breakpoint = -1; renderRecipe(); run(); }
 
+  // ---- input tabs: several inputs share one recipe; the active tab feeds the bake ----
+  function renderTabs() {
+    var html = tabs.map(function (t, i) {
+      return '<div class="tab' + (i === activeTab ? " active" : "") + '" data-tab="' + i + '" title="' + esc(t.name || "untitled") + '">' +
+        '<span class="tab-name">' + esc(t.name || "untitled") + "</span>" +
+        (tabs.length > 1 ? '<button class="tab-x" data-close="' + i + '" tabindex="-1" aria-label="Close tab">' + ICON_X + "</button>" : "") +
+        "</div>";
+    }).join("");
+    html += '<button id="tab-add" class="tab-add" title="New input tab" aria-label="New input tab">+</button>';
+    $("tabs").innerHTML = html;
+  }
+  function onTabClick(e) {
+    var x = e.target.closest("[data-close]");
+    if (x) { e.stopPropagation(); closeTab(+x.dataset.close); return; }
+    if (e.target.closest("#tab-add")) { newTab(); return; }
+    var t = e.target.closest("[data-tab]");
+    if (t) selectTab(+t.dataset.tab);
+  }
+  function syncActiveTab() { if (tabs[activeTab]) { tabs[activeTab].value = $("input").value; tabs[activeTab].name = name; } }
+  // loadTab makes tab i live: its text fills the input and drives a fresh bake.
+  function loadTab(i) {
+    activeTab = i;
+    var t = tabs[i];
+    name = t.name || "untitled";
+    $("input").value = t.value;
+    lastValue = t.value;
+    inputBytes = inputToBytes(t.value);
+    $("inlen").textContent = fmtBytes(inputBytes.length);
+    renderTabs(); renderCursors(); run();
+  }
+  function selectTab(i) { if (i === activeTab) return; syncActiveTab(); loadTab(i); }
+  function newTab() { syncActiveTab(); tabs.push({ name: "untitled", value: "" }); loadTab(tabs.length - 1); }
+  function closeTab(i) {
+    if (tabs.length <= 1) { tabs = [{ name: "untitled", value: "" }]; loadTab(0); return; }
+    tabs.splice(i, 1);
+    if (activeTab > i) activeTab--;
+    if (activeTab > tabs.length - 1) activeTab = tabs.length - 1;
+    loadTab(activeTab);
+  }
+
   function onInputEdit() {
     var v = $("input").value;
     if (collabOn) {
@@ -370,6 +413,7 @@
       if (ops.length) post({ type: "tamper:ops", ops: ops });
     }
     lastValue = v;
+    if (tabs[activeTab]) tabs[activeTab].value = v;
     inputBytes = inputToBytes(v);
     $("inlen").textContent = fmtBytes(inputBytes.length);
     renderCursors();
@@ -509,13 +553,20 @@
   }
   function loadArtifact(m) {
     var art = m.artifact || {};
-    inputBytes = new Uint8Array(art.bytes || new ArrayBuffer(0));
-    name = art.name || "untitled";
-    $("input").value = b2s(inputBytes);
-    lastValue = $("input").value;
+    var bytes = new Uint8Array(art.bytes || new ArrayBuffer(0));
+    var nm = art.name || "untitled";
+    var val = b2s(bytes);
+    // Open into a fresh tab unless the current one is still empty.
+    syncActiveTab();
+    if (tabs[activeTab] && tabs[activeTab].value) { tabs.push({ name: nm, value: val }); activeTab = tabs.length - 1; }
+    else tabs[activeTab] = { name: nm, value: val };
+    name = nm;
+    $("input").value = val;
+    lastValue = val;
+    inputBytes = bytes; // exact bytes for the first bake
     $("inlen").textContent = fmtBytes(inputBytes.length);
     if (m.view && Array.isArray(m.view.recipe)) recipe = m.view.recipe;
-    renderRecipe(); run();
+    renderTabs(); renderRecipe(); run();
   }
   // Collaboration: the input becomes a shared CRDT document. The first participant
   // seeds it from the loaded bytes; others receive the op log and apply it.
@@ -538,6 +589,7 @@
     el.value = text;
     el.selectionStart = el.selectionEnd = Math.min(caret, text.length);
     lastValue = text;
+    if (tabs[activeTab]) tabs[activeTab].value = text;
     inputBytes = s2b(text);
     $("inlen").textContent = fmtBytes(inputBytes.length);
     renderCursors();
