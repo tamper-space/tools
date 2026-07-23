@@ -2,9 +2,9 @@
 
 //go:build js && wasm
 
-// Exposes the recipe engine to the browser two ways: the versioned instantiable
-// API on tamperEngines.recipe (the public contract, docs/ENGINE-API.md) and the
-// legacy tamperOps/tamperCRDT globals the bundled single-file UI still uses.
+// Exposes the recipe engine to the browser as the versioned instantiable API on
+// tamperEngines.recipe (the public contract, docs/ENGINE-API.md). The bundled UI
+// consumes the same API as any third-party host.
 package main
 
 import (
@@ -31,8 +31,6 @@ func main() {
 	r.Set("capabilities", caps)
 	r.Set("create", js.FuncOf(create))
 	ns.Set("recipe", r)
-
-	registerLegacy()
 	select {}
 }
 
@@ -144,64 +142,4 @@ func runOp(a []js.Value) any {
 	}
 	res.Set("output", wasmutil.ToJS(out))
 	return res
-}
-
-// registerLegacy keeps the pre-API globals alive for the bundled UI: stateless
-// tamperOps, and tamperCRDT backed by one default document.
-func registerLegacy() {
-	api := js.Global().Get("Object").New()
-	api.Set("run", js.FuncOf(func(_ js.Value, a []js.Value) any { return runOp(a) }))
-	api.Set("manifest", js.FuncOf(func(_ js.Value, _ []js.Value) any {
-		out, _ := json.Marshal(ops.Manifest())
-		return string(out)
-	}))
-	js.Global().Set("tamperOps", api)
-
-	var doc *crdt.Doc
-	c := js.Global().Get("Object").New()
-	c.Set("init", js.FuncOf(func(_ js.Value, a []js.Value) any { doc = crdt.New(uint64(a[0].Int())); return nil }))
-	c.Set("seed", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		if doc == nil {
-			return "[]"
-		}
-		out, _ := json.Marshal(doc.Load(wasmutil.ToGo(a[0])))
-		return string(out)
-	}))
-	c.Set("loadOps", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		if doc == nil {
-			return nil
-		}
-		var incoming []crdt.Op
-		if json.Unmarshal([]byte(a[0].String()), &incoming) == nil {
-			for _, op := range incoming {
-				doc.Apply(op)
-			}
-		}
-		return nil
-	}))
-	c.Set("insert", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		if doc == nil {
-			return "null"
-		}
-		out, _ := json.Marshal(doc.InsertAt(a[0].Int(), byte(a[1].Int())))
-		return string(out)
-	}))
-	c.Set("del", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		if doc == nil {
-			return "null"
-		}
-		op, ok := doc.DeleteAt(a[0].Int())
-		if !ok {
-			return "null"
-		}
-		out, _ := json.Marshal(op)
-		return string(out)
-	}))
-	c.Set("text", js.FuncOf(func(_ js.Value, _ []js.Value) any {
-		if doc == nil {
-			return js.Global().Get("Uint8Array").New(0)
-		}
-		return wasmutil.ToJS(doc.Bytes())
-	}))
-	js.Global().Set("tamperCRDT", c)
 }

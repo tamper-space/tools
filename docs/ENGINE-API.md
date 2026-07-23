@@ -8,7 +8,7 @@ collaboration transport belong to the host.
 
 ## Versioning
 
-- `tamperEngines.apiVersion` (currently `1.0.0`) is the semver of the JS surface
+- `tamperEngines.apiVersion` (currently `1.1.0`) is the semver of the JS surface
   described here. Additive changes bump minor. A breaking change bumps major and
   the old major stays mounted alongside for a deprecation window.
 - Each engine reports its own `engineVersion`, versioning behavior (new ops, new
@@ -22,7 +22,7 @@ Loading an engine's WASM registers it into a shared global:
 
 ```js
 tamperEngines = {
-  apiVersion: "1.0.0",
+  apiVersion: "1.1.0",
   hex:    { tool, engineVersion, capabilities, create() },
   recipe: { tool, engineVersion, capabilities, create() },
 }
@@ -58,6 +58,7 @@ hex.analyze();                   // {size, entropy, categories: Uint8Array}
 hex.find(needleU8, ci);          // [offset, ...]
 hex.strings(min);                // [{offset, text}, ...]
 hex.encode(format);              // "hex"|"hexdump"|"base64"|"c"|"rust"|"go"|"python"|"json"|"intelhex"
+hex.encode(format, start, end);  // same, over a half-open byte range
 const id = hex.subscribe(ev => {}); hex.unsubscribe(id);
 hex.dispose();
 ```
@@ -102,9 +103,9 @@ instance, or by the `engine` Go package directly.
 - `view` is tool-owned and opaque to the host: it round-trips through hosts and
   the envelope untouched (hex: cursor/offset/encoding; recipe: the chain).
 
-## Legacy globals
+## Consumers
 
-The bundled single-file UIs still consume the pre-API globals (`tamperHex`,
-`tamperOps`, `tamperCRDT`). They remain registered by the same WASM binaries but
-are frozen: new capability lands only on `tamperEngines`, and the bundled UIs
-migrate to it (the workbench first) before the globals are removed.
+The bundled single-file UIs (and through them the tamper.space workbench) run
+entirely on this API; the pre-API globals (`tamperHex`, `tamperOps`,
+`tamperCRDT`) are gone. `tamperEngines` is the only surface the WASM binaries
+register.

@@ -25,7 +25,7 @@
 
   function newState(buf, name) {
     return {
-      buf, name: name || "", size: buf ? buf.length : 0, cats: null, entropy: 0,
+      buf, name: name || "", size: buf ? buf.length : 0, cats: null, entropy: 0, eng: null,
       cursor: 0, nibble: 0, pane: "hex", anchor: null,
       undo: [], redo: [], modified: false,
       matches: [], matchIdx: -1, matchLen: 0, lastFind: null,
@@ -139,6 +139,18 @@
     postToParent({ type: "tamper:ready", tool: "hex", accepts: ["bytes"] });
   };
 
+  // attachEngine binds a tab to its own engine instance: the buffer's source of
+  // truth lives in WASM; st.buf and st.cats are render caches refreshed from it.
+  function attachEngine(st) {
+    st.eng = window.tamperEngines.hex.create();
+    st.eng.load(st.buf || EMPTY);
+    st.buf = st.eng.bytes();
+    st.size = st.buf.length;
+    const a = st.eng.analyze();
+    st.cats = a.categories; st.entropy = a.entropy;
+  }
+  function dropEngine(st) { if (st && st.eng) { st.eng.dispose(); st.eng = null; } }
+
   function toast(msg) {
     let t = document.getElementById("toast");
     if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
@@ -173,14 +185,13 @@
     if (m.embedded) setEmbedded(true);
     const art = m.artifact || {};
     const st = newState(new Uint8Array(art.bytes || new ArrayBuffer(0)), art.name || "untitled");
-    const a = tamperHex.analyze(st.buf);
-    st.cats = a.categories; st.entropy = a.entropy;
+    attachEngine(st);
     applyView(m.view);
     if (m.view) {
       st.cursor = Math.min(m.view.cursor || 0, Math.max(0, st.size - 1));
       st.bookmarks = m.view.bookmarks || []; st.bmSeq = m.view.bmSeq || 0;
     }
-    if (g.embedded) { g.tabs = [st]; g.active = 0; } else { g.tabs.push(st); g.active = g.tabs.length - 1; }
+    if (g.embedded) { g.tabs.forEach(dropEngine); g.tabs = [st]; g.active = 0; } else { g.tabs.push(st); g.active = g.tabs.length - 1; }
     s = st;
     renderTabs(); syncTab();
   }
@@ -195,8 +206,7 @@
     const r = new FileReader();
     r.onload = () => {
       const st = newState(new Uint8Array(r.result), file.name);
-      const a = tamperHex.analyze(st.buf);
-      st.cats = a.categories; st.entropy = a.entropy;
+      attachEngine(st);
       g.tabs.push(st);
       g.active = g.tabs.length - 1;
       s = st;
@@ -224,6 +234,7 @@
   }
   function closeTab(i) {
     if (g.diff.on) exitDiff();
+    dropEngine(g.tabs[i]);
     g.tabs.splice(i, 1);
     if (!g.tabs.length) { g.active = -1; s = newState(null, ""); }
     else { g.active = Math.min(i, g.tabs.length - 1); s = g.tabs[g.active]; }
@@ -476,10 +487,14 @@
     off = Math.max(0, Math.min(off, s.size));
     removeLen = Math.max(0, Math.min(removeLen, s.size - off));
     const removed = s.buf.slice(off, off + removeLen);
-    const nb = new Uint8Array(s.size - removeLen + ins.length);
-    nb.set(s.buf.subarray(0, off), 0);
-    nb.set(ins, off);
-    nb.set(s.buf.subarray(off + removeLen), off + ins.length);
+    if (removeLen === ins.length && removeLen) s.eng.overwrite(off, ins);
+    else {
+      if (removeLen) s.eng.del(off, removeLen);
+      if (ins.length) s.eng.insert(off, ins);
+    }
+    const nb = s.eng.bytes();
+    // Categories patch locally for the immediate repaint; scheduleReanalyze
+    // reconciles from the engine right after.
     const nc = new Uint8Array(nb.length);
     nc.set(s.cats.subarray(0, off), 0);
     for (let i = 0; i < ins.length; i++) nc[off + i] = jsCat(ins[i]);
@@ -524,7 +539,7 @@
       if (k === "a") { e.preventDefault(); s.anchor = 0; moveTo(s.size - 1, true); return; }
       if (k === "f") { e.preventDefault(); els.find.focus(); return; }
       if (k === "g") { e.preventDefault(); els.goto.focus(); return; }
-      if (k === "c") { e.preventDefault(); copyText(tamperHex.encode(selBytes(), "hex")); return; }
+      if (k === "c") { e.preventDefault(); copyText(encodeScoped("hex", selRange())); return; }
       return;
     }
     switch (k) {
@@ -624,7 +639,7 @@
     s.lastFind = els.find.value;
     const needle = parseNeedle(els.find.value);
     if (!needle || !s.buf) { clearMatches(); els.findInfo.textContent = needle ? "" : "bad pattern"; render(); return; }
-    s.matches = tamperHex.find(s.buf, needle, ciFor(els.find.value));
+    s.matches = s.eng.find(needle, ciFor(els.find.value));
     s.matchLen = needle.length; s.matchIdx = -1;
     if (!s.matches.length) { els.findInfo.textContent = "0 matches"; render(); return; }
     stepMatch(1);
@@ -654,7 +669,7 @@
     const repl = replBytes();
     if (!needle) { els.findInfo.textContent = "bad pattern"; return; }
     if (repl === null) { els.findInfo.textContent = "bad replacement"; return; }
-    const hits = tamperHex.find(s.buf, needle, ciFor(els.find.value));
+    const hits = s.eng.find(needle, ciFor(els.find.value));
     if (!hits.length) { els.findInfo.textContent = "0 matches"; return; }
     const parts = []; let prev = 0, total = 0;
     for (const h of hits) { parts.push(s.buf.subarray(prev, h), repl); prev = h + needle.length; }
@@ -679,7 +694,7 @@
   function scanStrings() {
     if (!s.buf) return;
     const min = Math.max(1, parseInt(els.strMin.value, 10) || 4);
-    const hits = tamperHex.strings(s.buf, min);
+    const hits = s.eng.strings(min);
     els.strCount.textContent = `${hits.length} strings`;
     const n = Math.min(hits.length, STR_CAP);
     let html = "";
@@ -773,6 +788,15 @@
     const sr = selRange();
     return g.exScope === "sel" && sr ? s.buf.subarray(sr[0], sr[1] + 1) : s.buf;
   }
+  // encodeScoped encodes the whole buffer or an inclusive [start, end] range
+  // through the engine (which takes a half-open range).
+  function encodeScoped(format, sr) {
+    return sr ? s.eng.encode(format, sr[0], sr[1] + 1) : s.eng.encode(format);
+  }
+  function exRange() {
+    const sr = selRange();
+    return g.exScope === "sel" && sr ? sr : null;
+  }
   function exName(ex) {
     if (ex.raw && g.exScope === "whole") return s.name || "data.bin";
     const base = (s.name || "data").replace(/\.[^.]*$/, "");
@@ -782,10 +806,9 @@
     const btn = e.target.closest(".exbtn");
     if (!btn) return;
     const ex = EXPORTS.find((x) => x.id === btn.dataset.id);
-    const bytes = exBytes();
-    if (btn.dataset.act === "copy") copyText(tamperHex.encode(bytes, ex.id));
-    else if (ex.raw) saveFile(bytes, exName(ex));
-    else saveFile(tamperHex.encode(bytes, ex.id), exName(ex));
+    if (btn.dataset.act === "copy") copyText(encodeScoped(ex.id, exRange()));
+    else if (ex.raw) saveFile(exBytes(), exName(ex));
+    else saveFile(encodeScoped(ex.id, exRange()), exName(ex));
     closeExport();
   }
   function saveFile(content, name) {
@@ -813,7 +836,8 @@
     clearTimeout(reAn);
     reAn = setTimeout(() => {
       if (!s.buf) return;
-      const a = tamperHex.analyze(s.buf);
+      if (!s.eng) return;
+      const a = s.eng.analyze();
       s.cats = a.categories; s.entropy = a.entropy;
       updateStatus(); render();
     }, 250);

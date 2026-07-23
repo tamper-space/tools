@@ -2,9 +2,9 @@
 
 //go:build js && wasm
 
-// Exposes the hex engine to the browser two ways: the versioned instantiable
-// API on tamperEngines.hex (the public contract, docs/ENGINE-API.md) and the
-// legacy stateless tamperHex global the bundled single-file UI still uses.
+// Exposes the hex engine to the browser as the versioned instantiable API on
+// tamperEngines.hex (the public contract, docs/ENGINE-API.md). The bundled UI
+// consumes the same API as any third-party host.
 package main
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/tamper-space/tools/wasmutil"
 )
 
-const engineVersion = "0.1.0"
+const engineVersion = "0.2.0"
 
 func main() {
 	ns := wasmutil.Namespace()
@@ -30,8 +30,6 @@ func main() {
 	h.Set("capabilities", caps)
 	h.Set("create", js.FuncOf(create))
 	ns.Set("hex", h)
-
-	registerLegacy()
 	select {}
 }
 
@@ -92,7 +90,18 @@ func create(_ js.Value, _ []js.Value) any {
 		}
 		return hitsToJS(hex.Strings(inst.m.Bytes(), min, 20000))
 	})
-	b.Bind(obj, "encode", func(_ js.Value, a []js.Value) any { return hex.Encode(inst.m.Bytes(), a[0].String()) })
+	b.Bind(obj, "encode", func(_ js.Value, a []js.Value) any {
+		data := inst.m.Bytes()
+		// Optional half-open range: encode(format, start, end).
+		if len(a) >= 3 {
+			start, end := a[1].Int(), a[2].Int()
+			if start < 0 || end < start || end > len(data) {
+				return ""
+			}
+			data = data[start:end]
+		}
+		return hex.Encode(data, a[0].String())
+	})
 	b.Bind(obj, "doc", func(_ js.Value, a []js.Value) any {
 		var view json.RawMessage
 		if len(a) > 0 {
@@ -182,23 +191,4 @@ func hitsToJS(hits []hex.StringHit) js.Value {
 		arr.SetIndex(i, o)
 	}
 	return arr
-}
-
-// registerLegacy keeps the pre-API tamperHex global alive for the bundled UI.
-func registerLegacy() {
-	api := js.Global().Get("Object").New()
-	api.Set("analyze", js.FuncOf(func(_ js.Value, a []js.Value) any { return analysisToJS(hex.Analyze(wasmutil.ToGo(a[0]))) }))
-	api.Set("find", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		ci := len(a) > 2 && a[2].Bool()
-		return intsToJS(hex.Find(wasmutil.ToGo(a[0]), wasmutil.ToGo(a[1]), 100000, ci))
-	}))
-	api.Set("encode", js.FuncOf(func(_ js.Value, a []js.Value) any { return hex.Encode(wasmutil.ToGo(a[0]), a[1].String()) }))
-	api.Set("strings", js.FuncOf(func(_ js.Value, a []js.Value) any {
-		min := 4
-		if len(a) > 1 {
-			min = a[1].Int()
-		}
-		return hitsToJS(hex.Strings(wasmutil.ToGo(a[0]), min, 20000))
-	}))
-	js.Global().Set("tamperHex", api)
 }

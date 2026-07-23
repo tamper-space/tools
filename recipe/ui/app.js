@@ -9,9 +9,12 @@
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
   var remoteCursors = {}; // uid -> {name, color, start, end}
   var mirror = null, cursorTimer = 0, lastCursorKey = "";
+  var eng = null;     // ops/manifest engine instance
+  var crdtEng = null; // per-collab-session CRDT instance (site id from the shell)
 
   window.init = function () {
-    try { manifest = JSON.parse(tamperOps.manifest()); } catch (e) { manifest = []; }
+    eng = window.tamperEngines.recipe.create();
+    try { manifest = JSON.parse(eng.manifest()); } catch (e) { manifest = []; }
     renderOps();
     $("opsearch").addEventListener("input", renderOps);
     $("oplist").addEventListener("click", onOpClick);
@@ -115,16 +118,17 @@
     var s = 0;
     while (s < maxP - p && oldS.charCodeAt(oldS.length - 1 - s) === newS.charCodeAt(newS.length - 1 - s)) s++;
     var ops = [], o, i;
-    for (i = 0; i < oldS.length - p - s; i++) { o = tamperCRDT.del(p); if (o && o !== "null") ops.push(JSON.parse(o)); }
+    if (!crdtEng) return [];
+    for (i = 0; i < oldS.length - p - s; i++) { o = crdtEng.del(p); if (o && o !== "null") ops.push(JSON.parse(o)); }
     var ins = newS.slice(p, newS.length - s);
-    for (i = 0; i < ins.length; i++) { o = tamperCRDT.insert(p + i, ins.charCodeAt(i) & 0xff); if (o && o !== "null") ops.push(JSON.parse(o)); }
+    for (i = 0; i < ins.length; i++) { o = crdtEng.insert(p + i, ins.charCodeAt(i) & 0xff); if (o && o !== "null") ops.push(JSON.parse(o)); }
     return ops;
   }
 
   function run() {
     var cur = inputBytes, failAt = -1, errMsg = "";
     for (var i = 0; i < recipe.length; i++) {
-      var res = tamperOps.run(recipe[i].id, cur, recipe[i].args || {});
+      var res = eng.run(recipe[i].id, cur, recipe[i].args || {});
       if (res && res.error) { failAt = i; errMsg = res.error; break; }
       cur = res.output;
     }
@@ -166,17 +170,18 @@
   function onCollab(m) {
     collabOn = !!m.on;
     if (!collabOn) { remoteCursors = {}; renderCursors(); return; }
-    tamperCRDT.init(m.site || 1);
+    if (crdtEng) crdtEng.dispose();
+    crdtEng = window.tamperEngines.recipe.create({ site: m.site || 1 });
     if (m.seed) {
-      var ops = JSON.parse(tamperCRDT.seed(inputBytes) || "[]");
+      var ops = JSON.parse(crdtEng.seed(inputBytes) || "[]");
       lastValue = $("input").value;
       if (ops.length) post({ type: "tamper:ops", ops: ops });
     }
   }
   function onRemoteOps(ops) {
-    if (!collabOn || !ops || !ops.length) return;
-    tamperCRDT.loadOps(JSON.stringify(ops));
-    var text = b2s(tamperCRDT.text());
+    if (!collabOn || !crdtEng || !ops || !ops.length) return;
+    crdtEng.loadOps(JSON.stringify(ops));
+    var text = b2s(crdtEng.text());
     var el = $("input"), caret = el.selectionStart;
     el.value = text;
     el.selectionStart = el.selectionEnd = Math.min(caret, text.length);

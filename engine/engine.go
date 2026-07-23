@@ -15,7 +15,7 @@ import (
 // APIVersion is the semver of the JS-facing engine API (the tamperEngines
 // namespace). Additive changes bump minor; breaking changes bump major and keep
 // the old major mounted alongside during a deprecation window.
-const APIVersion = "1.0.0"
+const APIVersion = "1.1.0"
 
 // EnvelopeVersion is the version of the serialized Doc format.
 const EnvelopeVersion = 1
