@@ -38,4 +38,7 @@ state over `postMessage` (same origin only):
 
 ## License
 
-Licensed under the [GNU General Public License v3.0](LICENSE).
+Dual-licensed: [GNU General Public License v3.0](LICENSE) for open use, with
+commercial licenses available for proprietary embedding (see
+[COMMERCIAL.md](COMMERCIAL.md)). Contributions require the sign-off and license
+grant described in [CONTRIBUTING.md](CONTRIBUTING.md).

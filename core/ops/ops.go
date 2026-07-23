@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Tamper-Commercial
+
 // Package ops is the catalog of recipe operations: pure byte->byte transforms
 // that chain into a recipe. Each op is deterministic and self-contained so the
 // whole recipe can run client-side in WebAssembly.

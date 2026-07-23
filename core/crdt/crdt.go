@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Tamper-Commercial
+
 // Package crdt is an op-based sequence CRDT (RGA) over a byte/character stream.
 // Concurrent inserts, deletes, and value overwrites from multiple sites merge to
 // the same document regardless of the order ops are applied, so it powers

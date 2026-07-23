@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Tamper-Commercial
+
 //go:build js && wasm
 
 package main

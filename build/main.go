@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Tamper-Commercial
+
 // Builds each self-contained tool into <out>/<slug>/index.html: compiles the
 // tool's engine to WASM and inlines it (base64) with wasm_exec.js and the UI, so
 // each file also opens from file://. Run: go run ./build [-out dir]
