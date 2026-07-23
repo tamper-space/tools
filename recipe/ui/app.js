@@ -224,8 +224,9 @@
     $("recipe-empty").style.display = recipe.length ? "none" : "flex";
     $("steps").innerHTML = recipe.map(function (step, i) {
       var op = opByID(step.id) || { name: step.id, params: [] };
+      var sargs = step.args || {}; // a loaded/foreign recipe step may omit args
       var params = (op.params || []).map(function (p) {
-        return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, step.args[p.name]) + "</label>";
+        return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, sargs[p.name]) + "</label>";
       }).join("");
       var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "") +
         (i === breakpoint ? " bp" : "") + (breakpoint >= 0 && i > breakpoint ? " past-bp" : "");
@@ -363,7 +364,9 @@
     if (!el) return;
     var val = el.type === "checkbox" ? (el.checked ? "true" : "false") : el.value;
     recipe[+el.dataset.step].args[el.dataset.param] = val;
-    run();
+    // Debounce like the main input: coalesces per-keystroke bakes and the paired
+    // input+change events a <select>/checkbox fires into a single run.
+    clearTimeout(runTimer); runTimer = setTimeout(run, 120);
   }
   function clearRecipe() { recipe = []; breakpoint = -1; renderRecipe(); run(); }
 
@@ -484,11 +487,22 @@
     $("input").focus();
     onInputEdit();
   }
-  // swapToInput feeds the current output back in as the new input, for chaining
-  // one recipe's result into the next set of steps.
+  // swapToInput feeds the current output back in as the new input, for chaining one
+  // recipe's result into the next set of steps. It moves the RAW output bytes (not
+  // the re-encoded display text), so binary / UTF-8 / non-LF output chains exactly.
   function swapToInput() {
-    $("input").value = $("output").value;
-    onInputEdit();
+    var v = b2s(lastOutput); // raw bytes shown Latin-1, matching loadArtifact + the collab model
+    if (collabOn) {
+      var ops = diffToOps(lastValue, v);
+      if (ops.length) post({ type: "tamper:ops", ops: ops });
+    }
+    $("input").value = v;
+    lastValue = v;
+    if (tabs[activeTab]) tabs[activeTab].value = v;
+    inputBytes = lastOutput.slice(); // exact bytes, bypassing the input charset/EOL
+    $("inlen").textContent = fmtBytes(inputBytes.length);
+    renderCursors();
+    run();
     flash("out-swap");
   }
   // saveOutput downloads the raw output bytes (not the Latin-1 display string) so
@@ -542,6 +556,7 @@
     var op = opByID(opID); if (!op) return;
     var args = {};
     (op.params || []).forEach(function (p) { args[p.name] = p.default || ""; });
+    breakpoint = -1; // bake the full recipe so the applied decode is visible
     recipe.push({ id: opID, args: args });
     renderRecipe(); run();
   }
@@ -572,7 +587,7 @@
     lastValue = val;
     inputBytes = bytes; // exact bytes for the first bake
     $("inlen").textContent = fmtBytes(inputBytes.length);
-    if (m.view && Array.isArray(m.view.recipe)) recipe = m.view.recipe;
+    if (m.view && Array.isArray(m.view.recipe)) { recipe = m.view.recipe; breakpoint = -1; }
     renderTabs(); renderRecipe(); run();
   }
   // Collaboration: the input becomes a shared CRDT document. The first participant

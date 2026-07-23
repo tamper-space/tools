@@ -37,9 +37,10 @@ func registerEncoding2() {
 		return buf[:n], nil
 	}})
 	reg(Op{ID: "from-base85", Name: "From Base85 (Ascii85)", Category: "Encoding", run: func(in []byte, a Args) ([]byte, error) {
-		// Decode writes a full 4-byte group at a time, so the final partial group
-		// needs slack past len(in); +4 covers the last group's rounding.
-		dst := make([]byte, len(in)+4)
+		// A 'z' shortcut expands 1 input char to 4 output bytes, so the output can be
+		// up to 4x the input; size for the worst case (plus a group of rounding slack)
+		// or Decode silently stops when the buffer fills and drops the tail.
+		dst := make([]byte, len(in)*4+4)
 		ndst, _, err := ascii85.Decode(dst, in, true)
 		if err != nil {
 			return nil, err
@@ -175,7 +176,10 @@ func base62Decode(s string) ([]byte, error) {
 func escapeUnicode(in []byte, all bool) []byte {
 	var b strings.Builder
 	for _, u := range utf16.Encode([]rune(string(in))) {
-		if all || u < 0x20 || u > 0x7e {
+		// Escape the backslash too, even in default mode: otherwise a literal
+		// backslash in the input is indistinguishable from an escape prefix and a
+		// text like A would decode on the reverse pass, breaking the round trip.
+		if all || u < 0x20 || u > 0x7e || u == '\\' {
 			fmt.Fprintf(&b, "\\u%04x", u)
 		} else {
 			b.WriteByte(byte(u))

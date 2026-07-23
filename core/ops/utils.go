@@ -121,11 +121,7 @@ func registerUtils() {
 		{Name: "length", Label: "Length", Type: ParamNumber, Default: "0"},
 	}, run: func(in []byte, a Args) ([]byte, error) {
 		start := clampIndex(a.Int("start", 0), len(in))
-		length := a.Int("length", 0)
-		end := len(in)
-		if length > 0 {
-			end = clampIndex(start+length, len(in))
-		}
+		end := sliceEnd(start, a.Int("length", 0), len(in))
 		return append([]byte(nil), in[start:end]...), nil
 	}})
 	reg(Op{ID: "drop-bytes", Name: "Drop Bytes", Category: "Utils", Params: []Param{
@@ -133,11 +129,7 @@ func registerUtils() {
 		{Name: "length", Label: "Length", Type: ParamNumber, Default: "0"},
 	}, run: func(in []byte, a Args) ([]byte, error) {
 		start := clampIndex(a.Int("start", 0), len(in))
-		length := a.Int("length", 0)
-		end := len(in)
-		if length > 0 {
-			end = clampIndex(start+length, len(in))
-		}
+		end := sliceEnd(start, a.Int("length", 0), len(in))
 		out := append([]byte(nil), in[:start]...)
 		return append(out, in[end:]...), nil
 	}})
@@ -214,4 +206,14 @@ func clampIndex(i, n int) int {
 		return n
 	}
 	return i
+}
+
+// sliceEnd returns the exclusive end of a [start, start+length) window clamped to
+// n. length <= 0 means "to the end". The comparison is written to avoid the
+// start+length integer overflow that a huge length would otherwise cause.
+func sliceEnd(start, length, n int) int {
+	if length > 0 && length < n-start {
+		return start + length
+	}
+	return n
 }

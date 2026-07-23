@@ -9,6 +9,7 @@
 package ops
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -80,11 +81,18 @@ func magicDetect(in []byte) []magicHit {
 		if err != nil || len(out) == 0 {
 			continue
 		}
-		score := printableRatio(out)
-		if score < 0.85 { // decoded to binary/garbage: not a confident text decode
+		// A decoder that returns its input unchanged (e.g. From HTML Entity on
+		// "AT&T; ...", where UnescapeString passes unknown entities through) has not
+		// actually decoded anything, so it should not be offered as a suggestion.
+		if bytes.Equal(out, in) {
 			continue
 		}
-		hits = append(hits, magicHit{d.label, d.opID, preview(out, 80), score, shannon(out)})
+		score := printableRatio(out)
+		prev := preview(out, 80)
+		if score < 0.85 || prev == "" { // binary/garbage, or decodes to only whitespace
+			continue
+		}
+		hits = append(hits, magicHit{d.label, d.opID, prev, score, shannon(out)})
 	}
 	// Rank: most printable first, then lowest entropy (more structured).
 	for i := 0; i < len(hits); i++ {

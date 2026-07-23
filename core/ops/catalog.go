@@ -61,6 +61,9 @@ func registerEncoding() {
 	delimParam := Param{Name: "delim", Label: "Delimiter", Type: ParamText, Default: "Space"}
 	reg(Op{ID: "to-charcode", Name: "To Charcode", Category: "Encoding", Params: []Param{delimParam, baseParam}, run: func(in []byte, a Args) ([]byte, error) {
 		base := a.Int("base", 10)
+		if base < 2 || base > 36 {
+			return nil, fmt.Errorf("base must be between 2 and 36")
+		}
 		sep := delimValue(a.Get("delim"))
 		parts := make([]string, len(in))
 		for i, b := range in {
@@ -70,12 +73,18 @@ func registerEncoding() {
 	}})
 	reg(Op{ID: "from-charcode", Name: "From Charcode", Category: "Encoding", Params: []Param{baseParam}, run: func(in []byte, a Args) ([]byte, error) {
 		base := a.Int("base", 10)
+		if base < 2 || base > 36 {
+			return nil, fmt.Errorf("base must be between 2 and 36")
+		}
 		fields := strings.FieldsFunc(string(in), func(r rune) bool { return !isBaseDigit(r, base) })
 		out := make([]byte, 0, len(fields))
 		for _, f := range fields {
 			n, err := strconv.ParseInt(f, base, 64)
 			if err != nil {
 				return nil, err
+			}
+			if n < 0 || n > 255 {
+				return nil, fmt.Errorf("char code %d out of byte range (0-255)", n)
 			}
 			out = append(out, byte(n))
 		}
@@ -176,6 +185,17 @@ func base58Decode(s string) ([]byte, error) {
 		zeros++
 	}
 	return append(make([]byte, zeros), dec...), nil
+}
+
+// delimArg resolves a delimiter arg, falling back to def when the arg is absent or
+// blank. RunRecipe does not apply Param.Default, so flow-control ops use this to
+// honor their advertised default (e.g. fork's "Line feed") instead of delimValue's
+// empty-string case (which maps to a space).
+func delimArg(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
 }
 
 // delimValue maps CyberChef-style delimiter names to their literal string.

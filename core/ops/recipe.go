@@ -144,8 +144,8 @@ func RunRecipe(steps []Step, input []byte) RecipeResult {
 		case "label":
 			// marker only
 		case "fork":
-			sd := []byte(delimValue(st.Args.Get("splitDelim")))
-			mergeDelim = []byte(delimValue(st.Args.Get("mergeDelim")))
+			sd := []byte(delimValue(delimArg(st.Args.Get("splitDelim"), "Line feed")))
+			mergeDelim = []byte(delimValue(delimArg(st.Args.Get("mergeDelim"), "Line feed")))
 			var nb [][]byte
 			for _, b := range branches {
 				if len(sd) == 0 {
