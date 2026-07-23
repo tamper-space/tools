@@ -89,10 +89,10 @@
     }
     if (p.type === "number") {
       // Custom stepper: native spin buttons don't theme in dark mode, so hide them
-      // (CSS) and draw our own increment/decrement controls.
+      // (CSS) and draw our own increment/decrement controls with crisp chevrons.
       return '<span class="numfield"><input type="number" ' + attrs + ' value="' + esc(val == null ? "" : val) + '">' +
-        '<span class="numspin"><button type="button" class="numbtn" data-num="up" tabindex="-1" aria-label="Increase">&#9650;</button>' +
-        '<button type="button" class="numbtn" data-num="down" tabindex="-1" aria-label="Decrease">&#9660;</button></span></span>';
+        '<span class="numspin"><button type="button" class="numbtn" data-num="up" tabindex="-1" aria-label="Increase">' + ICON_CHEV_UP + "</button>" +
+        '<button type="button" class="numbtn" data-num="down" tabindex="-1" aria-label="Decrease">' + ICON_CHEV_DOWN + "</button></span></span>";
     }
     return '<input ' + attrs + ' value="' + esc(val == null ? "" : val) + '">';
   }
@@ -101,6 +101,8 @@
   var ICON_EYE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
   var ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M6.7 6.7C3.6 8.6 2 12 2 12s3 7 10 7c2 .1 3.9-.5 5.5-1.5"/><path d="M9.9 4.2A11 11 0 0 1 12 4c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7"/></svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  var ICON_CHEV_UP = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
+  var ICON_CHEV_DOWN = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
   var flowIDs = { fork: 1, merge: 1, register: 1, subsection: 1, label: 1, jump: 1, "conditional-jump": 1 };
 
   function renderRecipe() {
