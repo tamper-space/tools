@@ -6,6 +6,7 @@
   var lastOutput = new Uint8Array(0); // raw bytes of the last bake, for save / swap
   var name = "untitled";
   var inEnc = "latin1", outEnc = "latin1", eol = "LF"; // I/O text encoding + line endings
+  var breakpoint = -1; // step index to bake up to (-1 = full recipe)
   var runTimer = 0;
   var collabOn = false;
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
@@ -45,6 +46,9 @@
     $("in-enc").addEventListener("change", function () { inEnc = this.value; saveIO(); onInputEdit(); });
     $("out-enc").addEventListener("change", function () { outEnc = this.value; saveIO(); run(); });
     $("clear").addEventListener("click", clearRecipe);
+    $("bp-prev").addEventListener("click", function () { if (breakpoint > 0) setBreakpoint(breakpoint - 1); });
+    $("bp-next").addEventListener("click", function () { if (breakpoint >= 0 && breakpoint < recipe.length - 1) setBreakpoint(breakpoint + 1); });
+    $("bp-clear").addEventListener("click", function () { setBreakpoint(-1); });
     renderRecipe(); run();
     window.addEventListener("message", onMsg);
     post({ type: "tamper:ready", tool: "recipe", accepts: ["bytes"] });
@@ -165,40 +169,69 @@
   function isTrue(v) { v = String(v).toLowerCase(); return v === "true" || v === "1" || v === "yes" || v === "on"; }
 
   var ICON_X = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  var ICON_RUNTO = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8 5 4-5 4z" fill="currentColor" stroke="none"/></svg>';
   var ICON_CHEV_UP = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
   var ICON_CHEV_DOWN = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
   var flowIDs = { fork: 1, merge: 1, register: 1, subsection: 1, label: 1, jump: 1, "conditional-jump": 1 };
 
   function renderRecipe() {
+    clampBP();
     $("recipe-empty").style.display = recipe.length ? "none" : "block";
     $("steps").innerHTML = recipe.map(function (step, i) {
       var op = opByID(step.id) || { name: step.id, params: [] };
       var params = (op.params || []).map(function (p) {
         return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, step.args[p.name]) + "</label>";
       }).join("");
-      var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "");
+      var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "") +
+        (i === breakpoint ? " bp" : "") + (breakpoint >= 0 && i > breakpoint ? " past-bp" : "");
       var desc = op.description ? ' title="' + esc(op.description) + '"' : "";
+      var runOn = i === breakpoint ? " on" : "";
       return '<div class="' + cls + '" data-i="' + i + '" draggable="true">' +
         '<div class="stephead">' +
           '<span class="draghandle" aria-hidden="true">⠇⠇</span>' +
           '<span class="stepnum">' + (i + 1) + "</span>" +
           '<span class="stepname"' + desc + ">" + esc(op.name) + "</span>" +
           '<button class="stepswitch" data-toggle="' + i + '" role="switch" aria-checked="' + (!step.disabled) + '" title="' + (step.disabled ? "Enable step" : "Disable step") + '"><span class="switch"></span></button>' +
-          '<span class="stepctl"><button class="stepbtn" data-del="' + i + '" title="Remove step" aria-label="Remove step">' + ICON_X + "</button></span>" +
+          '<span class="stepctl">' +
+            '<button class="stepbtn' + runOn + '" data-runto="' + i + '" title="' + (runOn ? "Baking to here" : "Bake to here") + '" aria-label="Bake to this step">' + ICON_RUNTO + "</button>" +
+            '<button class="stepbtn" data-del="' + i + '" title="Remove step" aria-label="Remove step">' + ICON_X + "</button>" +
+          "</span>" +
         "</div>" +
         (params ? '<div class="params">' + params + "</div>" : "") + "</div>";
     }).join("");
+    renderStepbar();
   }
 
   function onStepClick(e) {
     var num = e.target.closest("[data-num]");
     if (num) { stepNumber(num); return; }
+    var rt = e.target.closest("[data-runto]");
+    if (rt) { var ri = +rt.dataset.runto; setBreakpoint(ri === breakpoint ? -1 : ri); return; }
     var t = e.target.closest("button");
     if (!t) return;
-    if (t.dataset.del != null) recipe.splice(+t.dataset.del, 1);
+    if (t.dataset.del != null) {
+      var d = +t.dataset.del;
+      recipe.splice(d, 1);
+      if (d === breakpoint) breakpoint = -1; else if (d < breakpoint) breakpoint--;
+    }
     else if (t.dataset.toggle != null) { var s = recipe[+t.dataset.toggle]; s.disabled = !s.disabled; }
     else return;
     renderRecipe(); run();
+  }
+  // setBreakpoint pins where baking stops (a "bake to here" step debugger); -1 bakes
+  // the whole recipe.
+  function setBreakpoint(i) {
+    breakpoint = (i >= 0 && i < recipe.length) ? i : -1;
+    renderRecipe(); run();
+  }
+  function clampBP() { if (recipe.length === 0) breakpoint = -1; else if (breakpoint >= recipe.length) breakpoint = recipe.length - 1; }
+  function renderStepbar() {
+    var on = breakpoint >= 0 && recipe.length > 0;
+    $("stepbar").hidden = !on;
+    if (!on) return;
+    $("bp-label").textContent = "Baking to step " + (breakpoint + 1) + " of " + recipe.length;
+    $("bp-prev").disabled = breakpoint <= 0;
+    $("bp-next").disabled = breakpoint >= recipe.length - 1;
   }
   // stepNumber adjusts a number param via the custom +/- buttons, respecting the
   // input's step/min/max, without a full re-render (keeps focus).
@@ -270,6 +303,7 @@
       recipe.splice(Math.max(0, Math.min(recipe.length, to)), 0, item);
     }
     dragFrom = -1; dragOp = null;
+    breakpoint = -1; // order changed; a stale bake-to index would point at a different op
     renderRecipe(); run();
   }
   function onStepDragEnd() {
@@ -286,7 +320,7 @@
     recipe[+el.dataset.step].args[el.dataset.param] = val;
     run();
   }
-  function clearRecipe() { recipe = []; renderRecipe(); run(); }
+  function clearRecipe() { recipe = []; breakpoint = -1; renderRecipe(); run(); }
 
   function onInputEdit() {
     var v = $("input").value;
@@ -319,8 +353,10 @@
   // flow-control steps (Fork/Merge/Register) work; the per-step error drives the
   // failed-step highlight.
   function run() {
+    clampBP();
+    var active = breakpoint >= 0 ? recipe.slice(0, breakpoint + 1) : recipe;
     var t0 = performance.now();
-    var res = eng.runRecipe(JSON.stringify(recipe.map(function (s) {
+    var res = eng.runRecipe(JSON.stringify(active.map(function (s) {
       return { id: s.id, args: s.args || {}, disabled: !!s.disabled };
     })), inputBytes);
     var ms = performance.now() - t0;

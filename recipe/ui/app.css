@@ -93,6 +93,27 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .step:hover .stepctl { opacity: 1; }
 .stepbtn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; }
 .stepbtn[data-del]:hover { color: var(--destructive); background: color-mix(in srgb, var(--destructive) 12%, transparent); }
+.stepbtn[data-runto]:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.stepbtn[data-runto].on { color: var(--primary); opacity: 1; }
+/* stepping: the breakpoint step is where baking stops; later steps are shown idle */
+.step.bp { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent); }
+.step.bp .stepctl { opacity: 1; }
+.step.past-bp { opacity: 0.4; }
+.step.past-bp:hover { opacity: 0.7; }
+
+/* step-through bar: appears only while a breakpoint is active */
+#stepbar {
+  display: flex; align-items: center; gap: 8px; flex: none; padding: 7px 10px;
+  border-bottom: 1px solid var(--border); font-size: 11px; color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+#stepbar[hidden] { display: none; }
+#bp-label { flex: 1; font-family: var(--mono); font-size: 10.5px; color: var(--muted-foreground); }
+.sb-btn { width: 22px; height: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 5px; color: var(--muted-foreground); }
+.sb-btn:hover { background: var(--accent); color: var(--foreground); }
+.sb-btn:disabled { opacity: 0.35; cursor: default; background: transparent; color: var(--muted-foreground); }
+.sb-clear { text-transform: none; letter-spacing: 0; font-size: 11px; padding: 2px 9px; color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); }
+.sb-clear:hover { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
 .params { display: flex; flex-direction: column; gap: 7px; padding: 2px 10px 10px; }
 .param { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted-foreground); }
 .param input { font: inherit; height: 26px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; }
