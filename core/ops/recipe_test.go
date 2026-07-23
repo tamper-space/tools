@@ -73,9 +73,51 @@ func TestRunRecipeErrorAndDisabled(t *testing.T) {
 
 func TestFlowOpsErrorStandalone(t *testing.T) {
 	// The control ops must refuse a direct Run (they exist only for the interpreter).
-	for _, id := range []string{"fork", "merge", "register"} {
+	for _, id := range []string{"fork", "merge", "register", "subsection", "label", "jump", "conditional-jump"} {
 		if _, err := Run(id, []byte("x"), nil); err == nil {
 			t.Errorf("%s should error when run standalone", id)
 		}
+	}
+}
+
+func TestRunRecipeSubsection(t *testing.T) {
+	// Uppercase only the letter runs; digits and spaces untouched.
+	r := RunRecipe(steps(
+		step("subsection", "regex", `[a-z]+`),
+		step("to-upper"),
+	), []byte("foo 123 bar"))
+	if string(r.Output) != "FOO 123 BAR" {
+		t.Fatalf("subsection = %q", r.Output)
+	}
+	// Merge ends the subsection: the following op applies to the whole data.
+	r = RunRecipe(steps(
+		step("subsection", "regex", `[a-z]+`),
+		step("to-upper"),
+		step("merge"),
+		step("reverse"),
+	), []byte("ab 12"))
+	if string(r.Output) != "21 BA" {
+		t.Fatalf("subsection+merge+reverse = %q", r.Output)
+	}
+}
+
+func TestRunRecipeJumpLoop(t *testing.T) {
+	// Loop: collapse doubled 'a's until none remain (conditional jump back to label).
+	r := RunRecipe(steps(
+		step("label", "name", "L"),
+		step("find-replace", "find", "aa", "replace", "a"),
+		step("conditional-jump", "regex", "aa", "label", "L", "maxJumps", "10"),
+	), []byte("aaaaaaaa"))
+	if r.FailedAt != -1 || string(r.Output) != "a" {
+		t.Fatalf("jump loop = %q failedAt=%d", r.Output, r.FailedAt)
+	}
+
+	// An unconditional jump is bounded by maxJumps (no hang, no iterCap failure).
+	r = RunRecipe(steps(
+		step("label", "name", "L"),
+		step("jump", "label", "L", "maxJumps", "3"),
+	), []byte("x"))
+	if r.FailedAt != -1 || string(r.Output) != "x" {
+		t.Fatalf("bounded jump = %q failedAt=%d", r.Output, r.FailedAt)
 	}
 }

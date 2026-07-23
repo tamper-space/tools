@@ -57,23 +57,92 @@ func init() {
 	reg(Op{ID: "register", Name: "Register", Category: "Flow control", Params: []Param{
 		{Name: "regex", Label: "Extract (regex with capture groups)", Type: ParamText},
 	}, run: flowOnly})
+	reg(Op{ID: "subsection", Name: "Subsection", Category: "Flow control", Params: []Param{
+		{Name: "regex", Label: "Section (regex)", Type: ParamText},
+	}, run: flowOnly})
+	reg(Op{ID: "label", Name: "Label", Category: "Flow control", Params: []Param{
+		{Name: "name", Label: "Name", Type: ParamText},
+	}, run: flowOnly})
+	reg(Op{ID: "jump", Name: "Jump", Category: "Flow control", Params: []Param{
+		{Name: "label", Label: "Label", Type: ParamText},
+		{Name: "maxJumps", Label: "Max jumps", Type: ParamNumber, Default: "10"},
+	}, run: flowOnly})
+	reg(Op{ID: "conditional-jump", Name: "Conditional Jump", Category: "Flow control", Params: []Param{
+		{Name: "regex", Label: "Match (regex)", Type: ParamText},
+		{Name: "label", Label: "Label", Type: ParamText},
+		{Name: "maxJumps", Label: "Max jumps", Type: ParamNumber, Default: "10"},
+	}, run: flowOnly})
 }
 
-// RunRecipe executes steps against input. Regular ops apply to every current
-// branch; flow-control ops reshape the branch set. On the first error it stops and
-// records where.
+// iterCap bounds total step executions so a jump loop can never hang the engine,
+// independent of any per-jump maxJumps.
+const iterCap = 100000
+
+// RunRecipe executes steps against input via a program counter, so jumps can loop.
+// Regular ops apply to every branch (or, under a subsection, only to the regex
+// matches within each branch); flow-control ops reshape the branch set or move the
+// PC. On the first error it stops and records where.
 func RunRecipe(steps []Step, input []byte) RecipeResult {
 	res := RecipeResult{FailedAt: -1, Steps: make([]StepResult, len(steps))}
 	branches := [][]byte{append([]byte(nil), input...)}
 	mergeDelim := []byte("\n")
 	forked := false
 	registers := map[string]string{}
+	var subsection *regexp.Regexp
 
+	// Pre-scan label positions; per-jump counters cap loops alongside the global iterCap.
+	labels := map[string]int{}
 	for i, st := range steps {
+		if st.ID == "label" && !st.Disabled {
+			labels[strings.TrimSpace(st.Args.Get("name"))] = i
+		}
+	}
+	jumpCounts := map[int]int{}
+
+	// applyRegular runs a normal op over the branches, honoring an active subsection
+	// (op applies only to the regex matches within each branch).
+	applyRegular := func(id string, args Args) error {
+		for bi, b := range branches {
+			if subsection != nil {
+				var innerErr error
+				out := subsection.ReplaceAllFunc(b, func(m []byte) []byte {
+					if innerErr != nil {
+						return m
+					}
+					o, err := Run(id, m, args)
+					if err != nil {
+						innerErr = err
+						return m
+					}
+					return o
+				})
+				if innerErr != nil {
+					return innerErr
+				}
+				branches[bi] = out
+			} else {
+				out, err := Run(id, b, args)
+				if err != nil {
+					return err
+				}
+				branches[bi] = out
+			}
+		}
+		return nil
+	}
+
+	for pc, iters := 0, 0; pc < len(steps); pc++ {
+		if iters++; iters > iterCap {
+			res.fail(pc, errBadf("recipe exceeded the iteration limit (possible infinite loop)"))
+			return res.finish(branches, mergeDelim, forked)
+		}
+		st := steps[pc]
 		if st.Disabled {
 			continue
 		}
 		switch st.ID {
+		case "label":
+			// marker only
 		case "fork":
 			sd := []byte(delimValue(st.Args.Get("splitDelim")))
 			mergeDelim = []byte(delimValue(st.Args.Get("mergeDelim")))
@@ -87,12 +156,23 @@ func RunRecipe(steps []Step, input []byte) RecipeResult {
 			}
 			branches, forked = nb, true
 		case "merge":
-			branches = [][]byte{bytes.Join(branches, mergeDelim)}
-			forked = false
+			if subsection != nil {
+				subsection = nil // end the subsection; data is already spliced
+			} else {
+				branches = [][]byte{bytes.Join(branches, mergeDelim)}
+				forked = false
+			}
+		case "subsection":
+			re, err := regexp.Compile(st.Args.Get("regex"))
+			if err != nil {
+				res.fail(pc, err)
+				return res.finish(branches, mergeDelim, forked)
+			}
+			subsection = re
 		case "register":
 			re, err := regexp.Compile(st.Args.Get("regex"))
 			if err != nil {
-				res.fail(i, err)
+				res.fail(pc, err)
 				return res.finish(branches, mergeDelim, forked)
 			}
 			if m := re.FindSubmatch(branches[0]); len(m) > 1 {
@@ -100,15 +180,27 @@ func RunRecipe(steps []Step, input []byte) RecipeResult {
 					registers["R"+strconv.Itoa(gi)] = string(g)
 				}
 			}
+		case "jump":
+			if target, ok := labels[strings.TrimSpace(st.Args.Get("label"))]; ok && jumpCounts[pc] < st.Args.Int("maxJumps", 10) {
+				jumpCounts[pc]++
+				pc = target // for-loop pc++ lands us on the step after the label
+				continue
+			}
+		case "conditional-jump":
+			re, err := regexp.Compile(st.Args.Get("regex"))
+			if err != nil {
+				res.fail(pc, err)
+				return res.finish(branches, mergeDelim, forked)
+			}
+			if target, ok := labels[strings.TrimSpace(st.Args.Get("label"))]; ok && jumpCounts[pc] < st.Args.Int("maxJumps", 10) && re.Match(branches[0]) {
+				jumpCounts[pc]++
+				pc = target
+				continue
+			}
 		default:
-			args := substituteRegisters(st.Args, registers)
-			for bi, b := range branches {
-				out, err := Run(st.ID, b, args)
-				if err != nil {
-					res.fail(i, err)
-					return res.finish(branches, mergeDelim, forked)
-				}
-				branches[bi] = out
+			if err := applyRegular(st.ID, substituteRegisters(st.Args, registers)); err != nil {
+				res.fail(pc, err)
+				return res.finish(branches, mergeDelim, forked)
 			}
 		}
 	}
