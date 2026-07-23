@@ -74,8 +74,10 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .empty { padding: 10px; }
 
 /* recipe */
+#recipe { position: relative; }
 #steps { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-#recipe-empty { padding: 14px; font-size: 12px; }
+/* empty state centered over the steps area; pointer-events off so drops still land */
+#recipe-empty { position: absolute; inset: 40px 0 0; display: flex; align-items: center; justify-content: center; padding: 24px; font-size: 12px; text-align: center; color: var(--muted-foreground); pointer-events: none; }
 .step {
   border: 1px solid var(--border); border-radius: 10px; background: var(--card); overflow: hidden;
   transition: border-color 0.12s, box-shadow 0.12s, opacity 0.12s;

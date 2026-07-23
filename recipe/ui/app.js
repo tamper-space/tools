@@ -221,7 +221,7 @@
 
   function renderRecipe() {
     clampBP();
-    $("recipe-empty").style.display = recipe.length ? "none" : "block";
+    $("recipe-empty").style.display = recipe.length ? "none" : "flex";
     $("steps").innerHTML = recipe.map(function (step, i) {
       var op = opByID(step.id) || { name: step.id, params: [] };
       var params = (op.params || []).map(function (p) {
