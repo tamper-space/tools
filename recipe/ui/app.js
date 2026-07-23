@@ -228,13 +228,19 @@
       var params = (op.params || []).map(function (p) {
         return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, sargs[p.name]) + "</label>";
       }).join("");
+      var collapsed = !!step.collapsed && params !== "";
       var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "") +
         (i === breakpoint ? " bp" : "") + (breakpoint >= 0 && i > breakpoint ? " past-bp" : "");
       var desc = op.description ? ' title="' + esc(op.description) + '"' : "";
       var runOn = i === breakpoint ? " on" : "";
+      // Steps with fields get a chevron to collapse the parameter body.
+      var collapseBtn = params !== ""
+        ? '<button class="stepcollapse' + (collapsed ? "" : " open") + '" data-collapse="' + i + '" title="' + (collapsed ? "Expand" : "Collapse") + '" aria-label="Toggle parameters">' + ICON_CHEV_RIGHT + "</button>"
+        : '<span class="stepcollapse-sp"></span>';
       return '<div class="' + cls + '" data-i="' + i + '" draggable="true">' +
         '<div class="stephead">' +
           '<span class="draghandle" aria-hidden="true">⠇⠇</span>' +
+          collapseBtn +
           '<span class="stepnum">' + (i + 1) + "</span>" +
           '<span class="stepname"' + desc + ">" + esc(op.name) + "</span>" +
           '<button class="stepswitch" data-toggle="' + i + '" role="switch" aria-checked="' + (!step.disabled) + '" title="' + (step.disabled ? "Enable step" : "Disable step") + '"><span class="switch"></span></button>' +
@@ -243,7 +249,7 @@
             '<button class="stepbtn" data-del="' + i + '" title="Remove step" aria-label="Remove step">' + ICON_X + "</button>" +
           "</span>" +
         "</div>" +
-        (params ? '<div class="params">' + params + "</div>" : "") + "</div>";
+        (params !== "" && !collapsed ? '<div class="params">' + params + "</div>" : "") + "</div>";
     }).join("");
     renderStepbar();
   }
@@ -253,6 +259,8 @@
     if (num) { stepNumber(num); return; }
     var rt = e.target.closest("[data-runto]");
     if (rt) { var ri = +rt.dataset.runto; setBreakpoint(ri === breakpoint ? -1 : ri); return; }
+    var col = e.target.closest("[data-collapse]");
+    if (col) { var cs = recipe[+col.dataset.collapse]; cs.collapsed = !cs.collapsed; renderRecipe(); return; }
     var t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.del != null) {

@@ -75,7 +75,7 @@ button:hover { background: var(--accent); color: var(--foreground); }
 
 /* recipe */
 #recipe { position: relative; }
-#steps { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+#steps { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 /* empty state centered over the steps area; pointer-events off so drops still land */
 #recipe-empty { position: absolute; inset: 40px 0 0; display: flex; align-items: center; justify-content: center; padding: 24px; font-size: 12px; text-align: center; color: var(--muted-foreground); pointer-events: none; }
 .step {
@@ -92,6 +92,12 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .stephead { display: flex; align-items: center; gap: 7px; padding: 7px 8px; }
 .draghandle { cursor: grab; color: var(--muted-foreground); opacity: 0.3; font-size: 11px; line-height: 1; letter-spacing: -3px; user-select: none; transition: opacity 0.1s; }
 .step:hover .draghandle { opacity: 0.65; }
+/* per-step collapse chevron (only on steps that have parameter fields) */
+.stepcollapse { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted-foreground); }
+.stepcollapse:hover { color: var(--foreground); background: var(--accent); }
+.stepcollapse svg { transition: transform 0.12s; }
+.stepcollapse.open svg { transform: rotate(90deg); }
+.stepcollapse-sp { flex: none; width: 18px; }
 .stepnum {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
