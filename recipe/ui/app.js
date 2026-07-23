@@ -238,7 +238,8 @@
       }).join("");
       var collapsed = !!step.collapsed && params !== "";
       var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "") +
-        (i === breakpoint ? " bp" : "") + (breakpoint >= 0 && i > breakpoint ? " past-bp" : "");
+        (i === breakpoint ? " bp" : "") + (breakpoint >= 0 && i > breakpoint ? " past-bp" : "") +
+        (params !== "" ? " has-params" : "");
       var desc = op.description ? ' title="' + esc(op.description) + '"' : "";
       var runOn = i === breakpoint ? " on" : "";
       // Steps with fields get a chevron to collapse the parameter body.
@@ -267,18 +268,29 @@
     if (num) { stepNumber(num); return; }
     var rt = e.target.closest("[data-runto]");
     if (rt) { var ri = +rt.dataset.runto; setBreakpoint(ri === breakpoint ? -1 : ri); return; }
-    var col = e.target.closest("[data-collapse]");
-    if (col) { var cs = recipe[+col.dataset.collapse]; cs.collapsed = !cs.collapsed; renderRecipe(); return; }
     var t = e.target.closest("button");
-    if (!t) return;
-    if (t.dataset.del != null) {
+    if (t && t.dataset.del != null) {
       var d = +t.dataset.del;
       recipe.splice(d, 1);
       if (d === breakpoint) breakpoint = -1; else if (d < breakpoint) breakpoint--;
+      renderRecipe(); run(); return;
     }
-    else if (t.dataset.toggle != null) { var s = recipe[+t.dataset.toggle]; s.disabled = !s.disabled; }
-    else return;
-    renderRecipe(); run();
+    if (t && t.dataset.toggle != null) {
+      var s = recipe[+t.dataset.toggle]; s.disabled = !s.disabled;
+      renderRecipe(); run(); return;
+    }
+    // Any other click on the header (name, number, chevron, empty space) collapses
+    // or expands the parameter body of steps that have one. Clicks inside .params
+    // don't reach here, so editing fields never toggles.
+    var head = e.target.closest(".stephead");
+    if (!head) return;
+    var stepEl = head.closest(".step");
+    if (!stepEl) return;
+    var st = recipe[+stepEl.dataset.i];
+    var sop = opByID(st.id);
+    if (!sop || !(sop.params || []).length) return; // nothing to collapse
+    st.collapsed = !st.collapsed;
+    renderRecipe();
   }
   // setBreakpoint pins where baking stops (a "bake to here" step debugger); -1 bakes
   // the whole recipe.

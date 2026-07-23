@@ -90,6 +90,8 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .step.drop-before { box-shadow: 0 -2px 0 0 var(--primary); }
 .step.drop-after { box-shadow: 0 2px 0 0 var(--primary); }
 .stephead { display: flex; align-items: center; gap: 7px; padding: 7px 8px; }
+/* a step with fields: its whole header toggles the param body */
+.step.has-params > .stephead { cursor: pointer; }
 .draghandle { cursor: grab; color: var(--muted-foreground); opacity: 0.3; font-size: 11px; line-height: 1; letter-spacing: -3px; user-select: none; transition: opacity 0.1s; }
 .step:hover .draghandle { opacity: 0.65; }
 /* per-step collapse chevron (only on steps that have parameter fields) */
