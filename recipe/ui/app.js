@@ -5,6 +5,7 @@
   var inputBytes = new Uint8Array(0);
   var lastOutput = new Uint8Array(0); // raw bytes of the last bake, for save / swap
   var name = "untitled";
+  var inEnc = "latin1", outEnc = "latin1", eol = "LF"; // I/O text encoding + line endings
   var runTimer = 0;
   var collabOn = false;
   var lastValue = ""; // baseline for diffing input edits into CRDT ops
@@ -39,15 +40,36 @@
     $("in-clear").addEventListener("click", clearInput);
     $("out-save").addEventListener("click", saveOutput);
     $("out-swap").addEventListener("click", swapToInput);
+    restoreIO();
+    $("in-eol").addEventListener("change", function () { eol = this.value; saveIO(); onInputEdit(); });
+    $("in-enc").addEventListener("change", function () { inEnc = this.value; saveIO(); onInputEdit(); });
+    $("out-enc").addEventListener("change", function () { outEnc = this.value; saveIO(); run(); });
     $("clear").addEventListener("click", clearRecipe);
     renderRecipe(); run();
     window.addEventListener("message", onMsg);
     post({ type: "tamper:ready", tool: "recipe", accepts: ["bytes"] });
   };
 
-  // Latin-1 keeps arbitrary bytes lossless through the text areas.
+  // Latin-1 keeps arbitrary bytes lossless through the text areas. It's the base
+  // for the collab CRDT sync (byte-exact) and the default I/O charset.
   function b2s(u8) { var s = ""; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return s; }
   function s2b(str) { var u = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) u[i] = str.charCodeAt(i) & 0xff; return u; }
+
+  // inputToBytes / outputToText honour the chosen charset + line endings for typed
+  // and pasted text. Latin-1 stays byte-exact; UTF-8 uses the platform codec.
+  function inputToBytes(str) {
+    if (eol !== "LF") { str = str.replace(/\r\n?/g, "\n"); str = str.replace(/\n/g, eol === "CRLF" ? "\r\n" : "\r"); }
+    return inEnc === "utf8" ? new TextEncoder().encode(str) : s2b(str);
+  }
+  function outputToText(u8) {
+    if (outEnc === "utf8") { try { return new TextDecoder("utf-8", { fatal: false }).decode(u8); } catch (e) {} }
+    return b2s(u8);
+  }
+  function restoreIO() {
+    try { var s = JSON.parse(localStorage.getItem("tn-recipe-io")) || {}; if (s.inEnc) inEnc = s.inEnc; if (s.outEnc) outEnc = s.outEnc; if (s.eol) eol = s.eol; } catch (e) {}
+    $("in-enc").value = inEnc; $("out-enc").value = outEnc; $("in-eol").value = eol;
+  }
+  function saveIO() { try { localStorage.setItem("tn-recipe-io", JSON.stringify({ inEnc: inEnc, outEnc: outEnc, eol: eol })); } catch (e) {} }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function opByID(id) { for (var i = 0; i < manifest.length; i++) if (manifest[i].id === id) return manifest[i]; return null; }
 
@@ -273,8 +295,8 @@
       if (ops.length) post({ type: "tamper:ops", ops: ops });
     }
     lastValue = v;
-    inputBytes = s2b(v);
-    $("inlen").textContent = inputBytes.length + " bytes";
+    inputBytes = inputToBytes(v);
+    $("inlen").textContent = fmtBytes(inputBytes.length);
     renderCursors();
     clearTimeout(runTimer); runTimer = setTimeout(run, 150);
   }
@@ -304,7 +326,7 @@
     var ms = performance.now() - t0;
     var out = res.output || new Uint8Array(0);
     lastOutput = out;
-    $("output").value = b2s(out);
+    $("output").value = outputToText(out);
     var failAt = typeof res.failedAt === "number" ? res.failedAt : -1;
     var steps = $("steps").children;
     for (var k = 0; k < steps.length; k++) steps[k].classList.toggle("failed", k === failAt);
@@ -339,7 +361,7 @@
   // swapToInput feeds the current output back in as the new input, for chaining
   // one recipe's result into the next set of steps.
   function swapToInput() {
-    $("input").value = b2s(lastOutput);
+    $("input").value = $("output").value;
     onInputEdit();
     flash("out-swap");
   }
@@ -377,7 +399,7 @@
     name = art.name || "untitled";
     $("input").value = b2s(inputBytes);
     lastValue = $("input").value;
-    $("inlen").textContent = inputBytes.length + " bytes";
+    $("inlen").textContent = fmtBytes(inputBytes.length);
     if (m.view && Array.isArray(m.view.recipe)) recipe = m.view.recipe;
     renderRecipe(); run();
   }
@@ -403,7 +425,7 @@
     el.selectionStart = el.selectionEnd = Math.min(caret, text.length);
     lastValue = text;
     inputBytes = s2b(text);
-    $("inlen").textContent = inputBytes.length + " bytes";
+    $("inlen").textContent = fmtBytes(inputBytes.length);
     renderCursors();
     clearTimeout(runTimer); runTimer = setTimeout(run, 150);
   }

@@ -30,6 +30,9 @@ button:hover { background: var(--accent); color: var(--foreground); }
 .iobtn:active { color: var(--primary); }
 .iobtn svg { display: block; }
 .iobtn.ok { color: var(--primary); }
+.iosel { font: inherit; height: 22px; padding: 0 4px; text-transform: none; letter-spacing: 0; font-size: 10.5px; color: var(--muted-foreground); background: var(--background); border: 1px solid var(--border); border-radius: 5px; }
+.iosel:hover { color: var(--foreground); }
+.iosel:focus { outline: none; border-color: var(--ring); color: var(--foreground); }
 
 /* operations catalog */
 #opsearch { width: 100%; font: inherit; height: 28px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; text-transform: none; letter-spacing: 0; }
