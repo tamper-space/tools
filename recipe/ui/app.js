@@ -3,6 +3,7 @@
   var manifest = [];              // [{id, name, category, params}]
   var recipe = [];               // [{id, args}]
   var inputBytes = new Uint8Array(0);
+  var lastOutput = new Uint8Array(0); // raw bytes of the last bake, for save / swap
   var name = "untitled";
   var runTimer = 0;
   var collabOn = false;
@@ -35,6 +36,9 @@
     inp.addEventListener("pointerup", reportCursor);
     document.addEventListener("selectionchange", function () { if (document.activeElement === inp) reportCursor(); });
     $("copy").addEventListener("click", copyOutput);
+    $("in-clear").addEventListener("click", clearInput);
+    $("out-save").addEventListener("click", saveOutput);
+    $("out-swap").addEventListener("click", swapToInput);
     $("clear").addEventListener("click", clearRecipe);
     renderRecipe(); run();
     window.addEventListener("message", onMsg);
@@ -293,20 +297,66 @@
   // flow-control steps (Fork/Merge/Register) work; the per-step error drives the
   // failed-step highlight.
   function run() {
+    var t0 = performance.now();
     var res = eng.runRecipe(JSON.stringify(recipe.map(function (s) {
       return { id: s.id, args: s.args || {}, disabled: !!s.disabled };
     })), inputBytes);
+    var ms = performance.now() - t0;
     var out = res.output || new Uint8Array(0);
+    lastOutput = out;
     $("output").value = b2s(out);
     var failAt = typeof res.failedAt === "number" ? res.failedAt : -1;
     var steps = $("steps").children;
     for (var k = 0; k < steps.length; k++) steps[k].classList.toggle("failed", k === failAt);
     $("output").classList.toggle("errored", failAt >= 0);
-    $("outlen").textContent = failAt >= 0 ? "error: " + (res.error || "failed") : out.length + " bytes";
+    $("outlen").textContent = failAt >= 0
+      ? "error: " + (res.error || "failed")
+      : fmtBytes(out.length) + " · " + fmtMs(ms);
   }
+  function fmtBytes(n) { return n === 1 ? "1 byte" : n + " bytes"; }
+  function fmtMs(ms) { return (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + " ms"; }
 
   function copyOutput() {
-    if (navigator.clipboard) navigator.clipboard.writeText($("output").value).catch(function () {});
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText($("output").value).then(function () { flash("copy"); }).catch(function () {});
+  }
+  // flash briefly marks an icon button as acted-on (no text label to change).
+  var flashTimer = 0;
+  function flash(id) {
+    var b = $(id); if (!b) return;
+    b.classList.add("ok");
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { b.classList.remove("ok"); }, 900);
+  }
+  // clearInput empties the input (routing through onInputEdit so a collab session
+  // sees the deletion and the recipe re-bakes).
+  function clearInput() {
+    if (!$("input").value) return;
+    $("input").value = "";
+    $("input").focus();
+    onInputEdit();
+  }
+  // swapToInput feeds the current output back in as the new input, for chaining
+  // one recipe's result into the next set of steps.
+  function swapToInput() {
+    $("input").value = b2s(lastOutput);
+    onInputEdit();
+    flash("out-swap");
+  }
+  // saveOutput downloads the raw output bytes (not the Latin-1 display string) so
+  // binary results round-trip exactly.
+  function saveOutput() {
+    var blob = new Blob([lastOutput.slice().buffer], { type: "application/octet-stream" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = downloadName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    flash("out-save");
+  }
+  function downloadName() {
+    var base = name && name !== "untitled" ? name.replace(/\.[^.]*$/, "") : "output";
+    return base + ".dat";
   }
 
   // Platform protocol (tamper: v2): the recipe operates on the input artifact;

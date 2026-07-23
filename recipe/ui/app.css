@@ -20,7 +20,16 @@ html, body { margin: 0; height: 100%; background: var(--background); color: var(
 .iohead + textarea { flex: 1; }
 button { font: inherit; cursor: pointer; color: var(--muted-foreground); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 2px 8px; transition: background 0.1s, color 0.1s; }
 button:hover { background: var(--accent); color: var(--foreground); }
-.phead button, .iohead button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.phead button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
+
+/* right-aligned I/O toolbar: byte count + icon actions */
+.iotools { margin-left: auto; display: flex; align-items: center; gap: 5px; }
+.iostat { font-family: var(--mono); font-size: 10px; letter-spacing: 0; }
+.iobtn { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; color: var(--muted-foreground); }
+.iobtn:hover { background: var(--accent); color: var(--foreground); }
+.iobtn:active { color: var(--primary); }
+.iobtn svg { display: block; }
+.iobtn.ok { color: var(--primary); }
 
 /* operations catalog */
 #opsearch { width: 100%; font: inherit; height: 28px; padding: 0 8px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; text-transform: none; letter-spacing: 0; }
