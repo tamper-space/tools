@@ -226,7 +226,14 @@
       var op = opByID(step.id) || { name: step.id, params: [] };
       var sargs = step.args || {}; // a loaded/foreign recipe step may omit args
       var params = (op.params || []).map(function (p) {
-        return '<label class="param">' + esc(p.label || p.name) + paramControl(p, i, sargs[p.name]) + "</label>";
+        var lbl = esc(p.label || p.name);
+        var ctl = paramControl(p, i, sargs[p.name]);
+        // Only checkboxes use a real <label> (clicking the text to toggle is
+        // expected there). For text/number/select a <label> would let a click on
+        // the field name or the row's dead space focus/open the control, so use a
+        // plain container and let only the control itself be the click target.
+        if (p.type === "boolean") return '<label class="param">' + lbl + ctl + "</label>";
+        return '<div class="param"><span class="param-label">' + lbl + "</span>" + ctl + "</div>";
       }).join("");
       var collapsed = !!step.collapsed && params !== "";
       var cls = "step" + (step.disabled ? " off" : "") + (flowIDs[step.id] ? " flow" : "") +
