@@ -561,7 +561,15 @@
     if (magicOpen) renderMagic();
   }
   function toggleMagic(e) { e.stopPropagation(); if (magicOpen) closeMagic(); else openMagic(); }
-  function openMagic() { magicOpen = true; $("magic-pop").hidden = false; renderMagic(); }
+  function openMagic() {
+    magicOpen = true;
+    // Anchor the popover just under the wand (output header sits mid-pane and moves
+    // when the input is resized, so compute the offset rather than hard-code it).
+    var wr = $("magic-wand").getBoundingClientRect(), ir = $("io").getBoundingClientRect();
+    $("magic-pop").style.top = (wr.bottom - ir.top + 4) + "px";
+    $("magic-pop").hidden = false;
+    renderMagic();
+  }
   function closeMagic() { magicOpen = false; $("magic-pop").hidden = true; }
   function renderMagic() {
     var pop = $("magic-pop");
