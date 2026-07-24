@@ -573,7 +573,7 @@
   function closeMagic() { magicOpen = false; $("magic-pop").hidden = true; }
   function renderMagic() {
     var pop = $("magic-pop");
-    if (!suggestions.length) { pop.innerHTML = '<div class="magic-empty">No confident decoding detected for this input.</div>'; return; }
+    if (!suggestions.length) { pop.innerHTML = '<div class="magic-empty">No confident decoding detected in the output.</div>'; return; }
     pop.innerHTML = '<div class="magic-head">Suggested decodings</div>' + suggestions.map(function (s) {
       return '<button type="button" class="magic-item" data-magic="' + esc(s.opID) + '">' +
         '<span class="magic-row"><span class="magic-label">' + esc(s.label) + '</span>' +
